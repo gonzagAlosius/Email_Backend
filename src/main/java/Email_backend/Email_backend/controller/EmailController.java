@@ -19,9 +19,9 @@ public class EmailController {
     private EmailReceiveService emailReceiveService;
 
     @GetMapping("/inbox")
-    public ResponseEntity<?> getInbox() {
+    public ResponseEntity<?> getInbox(@RequestHeader("X-Email") String email, @RequestHeader("X-Password") String password) {
         try {
-            return ResponseEntity.ok(emailReceiveService.fetchInbox());
+            return ResponseEntity.ok(emailReceiveService.fetchInbox(email, password));
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError().body("Failed to load inbox: " + e.getMessage());
@@ -29,9 +29,9 @@ public class EmailController {
     }
 
     @GetMapping("/sent")
-    public ResponseEntity<?> getSentMessages() {
+    public ResponseEntity<?> getSentMessages(@RequestHeader("X-Email") String email, @RequestHeader("X-Password") String password) {
         try {
-            return ResponseEntity.ok(emailReceiveService.fetchSentMessages());
+            return ResponseEntity.ok(emailReceiveService.fetchSentMessages(email, password));
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError().body("Failed to load sent messages: " + e.getMessage());
@@ -39,9 +39,9 @@ public class EmailController {
     }
 
     @PostMapping("/send")
-    public ResponseEntity<String> sendEmail(@RequestBody EmailRequest emailRequest) {
+    public ResponseEntity<String> sendEmail(@RequestHeader("X-Email") String email, @RequestHeader("X-Password") String password, @RequestBody EmailRequest emailRequest) {
         try {
-            emailService.sendEmail(emailRequest);
+            emailService.sendEmail(emailRequest, email, password);
             return ResponseEntity.ok("Email sent successfully!");
         } catch (Exception e) {
             e.printStackTrace();
