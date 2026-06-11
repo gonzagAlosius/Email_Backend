@@ -13,6 +13,7 @@ public class EmailResponse {
     private String subject;
     private String snippet;
     private String content;
+    private Long uid;
     
     @JsonProperty("isRead")
     private boolean isRead;
@@ -45,6 +46,9 @@ public class EmailResponse {
 
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
+
+    public Long getUid() { return uid; }
+    public void setUid(Long uid) { this.uid = uid; }
 
     public boolean getIsRead() { return isRead; }
     public void setIsRead(boolean isRead) { this.isRead = isRead; }

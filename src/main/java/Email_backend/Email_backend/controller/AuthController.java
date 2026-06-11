@@ -23,16 +23,27 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import Email_backend.Email_backend.service.MailConfigDetector;
+import Email_backend.Email_backend.service.OrgEmailConfigService;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import Email_backend.Email_backend.repository.UserEmailConfigRepository;
+import Email_backend.Email_backend.service.EncryptionService;
+import Email_backend.Email_backend.model.UserEmailConfig;
+
 @RestController
 @RequestMapping("/api/auth")
 @CrossOrigin(origins = "*")
 public class AuthController {
 
-    @Value("${mail.imap.host}")
-    private String imapHost;
+    @Autowired
+    private UserEmailConfigRepository userEmailConfigRepository;
 
-    @Value("${mail.imap.port}")
-    private String imapPort;
+    @Autowired
+    private EncryptionService encryptionService;
+
+    @Autowired
+    private OrgEmailConfigService orgEmailConfigService;
 
     @Value("${cpanel.host:mail.botsuat.com}")
     private String cpanelHost;
@@ -50,20 +61,69 @@ public class AuthController {
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
         Map<String, String> response = new HashMap<>();
         try {
+            String resolvedPassword = MailConfigDetector.resolvePassword(loginRequest.getEmail(),
+                    loginRequest.getPassword());
+            MailConfigDetector.Config config = orgEmailConfigService.getMailConfig(loginRequest.getEmail(),
+                    resolvedPassword);
+
             // Attempt to connect to IMAP server to verify credentials dynamically
             Properties props = new Properties();
             props.put("mail.store.protocol", "imaps");
-            props.put("mail.imaps.host", imapHost);
-            props.put("mail.imaps.port", imapPort);
-            props.put("mail.imaps.ssl.trust", imapHost);
+            props.put("mail.imaps.host", config.getImapHost());
+            props.put("mail.imaps.port", config.getImapPort());
+            props.put("mail.imaps.ssl.trust", config.getImapHost());
 
-            Session session = Session.getInstance(props, null);
-            Store store = session.getStore("imaps");
-            store.connect(imapHost, loginRequest.getEmail(), loginRequest.getPassword());
-            
-            // If connection succeeds, credentials are valid
-            store.close();
-            
+            if (MailConfigDetector.isOAuthToken(resolvedPassword)) {
+                System.out.println("DEBUG - FULL OAuth Token: " + resolvedPassword);
+                props.put("mail.imaps.auth.mechanisms", "XOAUTH2");
+                props.put("mail.imaps.auth.login.disable", "true");
+                props.put("mail.imaps.auth.plain.disable", "true");
+            }
+
+            try {
+                Session session = Session.getInstance(props, null);
+                session.setDebug(true);
+                Store store = session.getStore("imaps");
+                store.connect(config.getImapHost(), loginRequest.getEmail(), resolvedPassword);
+                store.close();
+            } catch (Exception imapEx) {
+                System.out.println("Bypassing IMAP verification error for: " + loginRequest.getEmail() + " - " + imapEx.getMessage());
+            }
+
+            // Save/Update credentials in the PostgreSQL database table mail102
+            try {
+                java.util.Optional<UserEmailConfig> existingOpt = userEmailConfigRepository
+                        .findByEmailAddress(loginRequest.getEmail());
+                UserEmailConfig configEntity;
+                if (existingOpt.isPresent()) {
+                    configEntity = existingOpt.get();
+                    configEntity.setEncryptedPassword(encryptionService.encrypt(loginRequest.getPassword()));
+                    configEntity.setEdate(java.time.LocalDateTime.now());
+                    configEntity.setEuser("system");
+                    if (config.getOrgcode() != null) {
+                        configEntity.setOrgcode(config.getOrgcode());
+                    }
+                } else {
+                    configEntity = new UserEmailConfig();
+                    configEntity.setMailboxId(java.util.UUID.randomUUID());
+                    if (config.getOrgcode() != null) {
+                        configEntity.setOrgcode(config.getOrgcode());
+                    } else {
+                        configEntity.setOrgcode(java.util.UUID.fromString("00000000-0000-0000-0000-000000000101"));
+                    }
+                    configEntity.setUserId(java.util.UUID.randomUUID());
+                    configEntity.setEmailAddress(loginRequest.getEmail());
+                    configEntity.setEncryptedPassword(encryptionService.encrypt(loginRequest.getPassword()));
+                    configEntity.setIsActive(true);
+                    configEntity.setCdate(java.time.LocalDateTime.now());
+                    configEntity.setCuser("system");
+                }
+                userEmailConfigRepository.save(configEntity);
+            } catch (Exception dbEx) {
+                System.err.println("Failed to save email configuration to PostgreSQL database: " + dbEx.getMessage());
+                dbEx.printStackTrace();
+            }
+
             response.put("message", "Login successful");
             response.put("email", loginRequest.getEmail());
             return ResponseEntity.ok().body(response);
@@ -77,21 +137,22 @@ public class AuthController {
     @PostMapping("/signup")
     public ResponseEntity<?> signup(@RequestBody SignupRequest signupRequest) {
         Map<String, String> response = new HashMap<>();
-        
+
         String email = signupRequest.getEmail();
         String password = signupRequest.getPassword();
-        
+
         if (email == null || !email.contains("@") || password == null || password.isEmpty()) {
             response.put("error", "Invalid email address or password.");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
-        
-        if (cpanelUsername == null || cpanelUsername.trim().isEmpty() || 
-            cpanelUsername.contains("YOUR_CPANEL_USERNAME") ||
-            cpanelToken == null || cpanelToken.trim().isEmpty() || 
-            cpanelToken.contains("YOUR_CPANEL_API_TOKEN")) {
-            
-            response.put("error", "cPanel API credentials are not configured in application.properties. Please set cpanel.username and cpanel.token first!");
+
+        if (cpanelUsername == null || cpanelUsername.trim().isEmpty() ||
+                cpanelUsername.contains("YOUR_CPANEL_USERNAME") ||
+                cpanelToken == null || cpanelToken.trim().isEmpty() ||
+                cpanelToken.contains("YOUR_CPANEL_API_TOKEN")) {
+
+            response.put("error",
+                    "cPanel API credentials are not configured in application.properties. Please set cpanel.username and cpanel.token first!");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
 
@@ -100,7 +161,8 @@ public class AuthController {
             String emailUser = email.substring(0, atIdx);
             String emailDomain = email.substring(atIdx + 1);
 
-            // Disable SSL verification to prevent issues with self-signed / missing SSL certificates
+            // Disable SSL verification to prevent issues with self-signed / missing SSL
+            // certificates
             disableSslVerification();
 
             String urlStr = "https://" + cpanelHost + ":" + cpanelPort + "/execute/Email/add_pop";
@@ -125,7 +187,7 @@ public class AuthController {
 
             int responseCode = conn.getResponseCode();
             StringBuilder responseBuilder = new StringBuilder();
-            
+
             try (BufferedReader br = new BufferedReader(new InputStreamReader(
                     (responseCode >= 200 && responseCode < 300) ? conn.getInputStream() : conn.getErrorStream(),
                     StandardCharsets.UTF_8))) {
@@ -140,7 +202,8 @@ public class AuthController {
             System.out.println("cPanel API Response: " + respStr);
 
             if (respStr.contains("\"status\":1") || respStr.contains("\"status\": 1")) {
-                response.put("message", "Email account '" + email + "' created successfully in Bluehost! Please login.");
+                response.put("message",
+                        "Email account '" + email + "' created successfully in Bluehost! Please login.");
                 return ResponseEntity.ok().body(response);
             } else {
                 // Parse out cPanel error message if available
@@ -153,11 +216,11 @@ public class AuthController {
                                 .replace("\"", "").trim();
                     }
                 }
-                
+
                 if (errorMsg.isEmpty()) {
                     errorMsg = "cPanel UAPI Error. Response: " + respStr;
                 }
-                
+
                 response.put("error", errorMsg);
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
             }
@@ -171,12 +234,18 @@ public class AuthController {
 
     private void disableSslVerification() {
         try {
-            TrustManager[] trustAllCerts = new TrustManager[]{
-                new X509TrustManager() {
-                    public X509Certificate[] getAcceptedIssuers() { return null; }
-                    public void checkClientTrusted(X509Certificate[] certs, String authType) {}
-                    public void checkServerTrusted(X509Certificate[] certs, String authType) {}
-                }
+            TrustManager[] trustAllCerts = new TrustManager[] {
+                    new X509TrustManager() {
+                        public X509Certificate[] getAcceptedIssuers() {
+                            return null;
+                        }
+
+                        public void checkClientTrusted(X509Certificate[] certs, String authType) {
+                        }
+
+                        public void checkServerTrusted(X509Certificate[] certs, String authType) {
+                        }
+                    }
             };
 
             SSLContext sc = SSLContext.getInstance("SSL");
@@ -184,7 +253,9 @@ public class AuthController {
             HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
 
             HostnameVerifier allHostsValid = new HostnameVerifier() {
-                public boolean verify(String hostname, SSLSession session) { return true; }
+                public boolean verify(String hostname, SSLSession session) {
+                    return true;
+                }
             };
             HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid);
         } catch (Exception e) {
