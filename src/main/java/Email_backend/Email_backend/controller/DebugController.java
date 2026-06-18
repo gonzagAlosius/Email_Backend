@@ -9,24 +9,24 @@ import org.springframework.web.bind.annotation.*;
 @CrossOrigin(origins = "*")
 public class DebugController {
 
-    @Autowired
-    private EncryptionService encryptionService;
+  @Autowired
+  private EncryptionService encryptionService;
 
-    @GetMapping("/decrypt")
-    public String decrypt(@RequestParam("value") String value) {
-        try {
-            return encryptionService.decrypt(value);
-        } catch (Exception e) {
-            return "Error: " + e.getMessage();
-        }
+  @GetMapping("/decrypt")
+  public String decrypt(@RequestParam("value") String value) {
+    try {
+      return encryptionService.decrypt(value);
+    } catch (Exception e) {
+      return "Error: " + e.getMessage();
     }
+  }
 
-    @GetMapping("/encrypt")
-    public String encrypt(@RequestParam("value") String value) {
-        try {
-            return encryptionService.encrypt(value);
-        } catch (Exception e) {
-            return "Error: " + e.getMessage();
-        }
+  @GetMapping("/encrypt")
+  public String encrypt(@RequestParam("value") String value) {
+    try {
+      return encryptionService.encrypt(value);
+    } catch (Exception e) {
+      return "Error: " + e.getMessage();
     }
+  }
 }

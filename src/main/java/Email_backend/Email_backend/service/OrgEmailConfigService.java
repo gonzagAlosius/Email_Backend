@@ -22,7 +22,7 @@ public class OrgEmailConfigService {
 
     public MailConfigDetector.Config getMailConfig(String email, String resolvedPassword) {
         try {
-            UUID orgUuid = null;
+            Long orgUuid = null;
             Optional<UserEmailConfig> userConfigOpt = userEmailConfigRepository.findByEmailAddress(email);
             if (userConfigOpt.isPresent() && userConfigOpt.get().getOrgcode() != null) {
                 orgUuid = userConfigOpt.get().getOrgcode();
@@ -35,9 +35,9 @@ public class OrgEmailConfigService {
             if (orgUuid != null) {
                 configs = jdbcTemplate.query(sql, (rs, rowNum) -> {
                     OrgEmailConfig config = new OrgEmailConfig();
-                    String codeStr = rs.getString("orgcode");
-                    if (codeStr != null) {
-                        config.setOrgcode(UUID.fromString(codeStr));
+                    long codeVal = rs.getLong("orgcode");
+                    if (!rs.wasNull()) {
+                        config.setOrgcode(codeVal);
                     }
                     config.setImapHost(rs.getString("imap_host"));
 
@@ -67,9 +67,9 @@ public class OrgEmailConfigService {
                 String sqlAll = "SELECT orgcode, imap_host, imap_port, imap_secure, smtp_host, smtp_port, smtp_secure FROM mail101";
                 java.util.List<OrgEmailConfig> allConfigs = jdbcTemplate.query(sqlAll, (rs, rowNum) -> {
                     OrgEmailConfig config = new OrgEmailConfig();
-                    String codeStr = rs.getString("orgcode");
-                    if (codeStr != null) {
-                        config.setOrgcode(UUID.fromString(codeStr));
+                    long codeVal = rs.getLong("orgcode");
+                    if (!rs.wasNull()) {
+                        config.setOrgcode(codeVal);
                     }
                     config.setImapHost(rs.getString("imap_host"));
 

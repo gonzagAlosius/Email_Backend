@@ -26,7 +26,7 @@ public class MailConfigDetector {
     }
 
     public static class Config {
-        private final java.util.UUID orgcode;
+        private final Long orgcode;
         private final String imapHost;
         private final String imapPort;
         private final Boolean imapSecure;
@@ -39,7 +39,7 @@ public class MailConfigDetector {
             this(null, imapHost, imapPort, true, smtpHost, smtpPort, true, sentFolder);
         }
 
-        public Config(java.util.UUID orgcode, String imapHost, String imapPort, Boolean imapSecure, String smtpHost, String smtpPort, Boolean smtpSecure, String sentFolder) {
+        public Config(Long orgcode, String imapHost, String imapPort, Boolean imapSecure, String smtpHost, String smtpPort, Boolean smtpSecure, String sentFolder) {
             this.orgcode = orgcode;
             this.imapHost = imapHost;
             this.imapPort = imapPort;
@@ -50,7 +50,7 @@ public class MailConfigDetector {
             this.sentFolder = sentFolder;
         }
 
-        public java.util.UUID getOrgcode() {
+        public Long getOrgcode() {
             return orgcode;
         }
 

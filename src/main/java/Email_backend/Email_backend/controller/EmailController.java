@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 import Email_backend.Email_backend.repository.UserEmailConfigRepository;
 import Email_backend.Email_backend.service.EncryptionService;
+import Email_backend.Email_backend.service.OrgEmailConfigService;
 import Email_backend.Email_backend.model.UserEmailConfig;
 import org.springframework.http.HttpStatus;
 import java.util.Optional;
@@ -34,6 +35,9 @@ public class EmailController {
 
     @Autowired
     private EncryptionService encryptionService;
+
+    @Autowired
+    private OrgEmailConfigService orgEmailConfigService;
 
     @GetMapping("/inbox")
     public ResponseEntity<?> getInbox(
@@ -70,7 +74,19 @@ public class EmailController {
                     } else {
                         configEntity = new UserEmailConfig();
                         configEntity.setMailboxId(java.util.UUID.randomUUID());
-                        configEntity.setOrgcode(java.util.UUID.randomUUID());
+                        
+                        Long resolvedOrgcode = 101L;
+                        try {
+                            Email_backend.Email_backend.service.MailConfigDetector.Config mailConfig = 
+                                    orgEmailConfigService.getMailConfig(email, actualPassword);
+                            if (mailConfig != null && mailConfig.getOrgcode() != null) {
+                                resolvedOrgcode = mailConfig.getOrgcode();
+                            }
+                        } catch (Exception e) {
+                            System.err.println("Could not resolve orgcode dynamically, defaulting to 101L: " + e.getMessage());
+                        }
+                        configEntity.setOrgcode(resolvedOrgcode);
+                        
                         configEntity.setUserId(java.util.UUID.randomUUID());
                         configEntity.setEmailAddress(email);
                         configEntity.setEncryptedPassword(encryptionService.encrypt(password));

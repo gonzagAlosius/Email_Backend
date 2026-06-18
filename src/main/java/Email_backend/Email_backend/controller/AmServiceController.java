@@ -94,7 +94,7 @@ public class AmServiceController {
                                 orgCode = Long.parseLong((String) orgCodeObj);
                             }
                             
-                            java.util.UUID orgUuid = convertOrgCodeToUuid(orgCode);
+                            Long orgUuid = orgCode != null ? orgCode.longValue() : null;
                             java.util.UUID userUuid = convertUserScdToUuid(userScd);
                             
                             java.util.Optional<UserEmailConfig> existingOpt = userEmailConfigRepository.findByEmailAddress(email);
@@ -112,7 +112,7 @@ public class AmServiceController {
                             } else {
                                 configEntity = new UserEmailConfig();
                                 configEntity.setMailboxId(java.util.UUID.randomUUID());
-                                configEntity.setOrgcode(orgUuid != null ? orgUuid : java.util.UUID.randomUUID());
+                                configEntity.setOrgcode(orgUuid != null ? orgUuid : 101L);
                                 configEntity.setUserId(userUuid != null ? userUuid : java.util.UUID.randomUUID());
                                 configEntity.setEmailAddress(email);
                                 configEntity.setEncryptedPassword(""); // Empty password initially, will be set on direct login or OAuth use

@@ -9,8 +9,8 @@ import java.util.UUID;
 public class OrgEmailConfig {
 
     @Id
-    @Column(name = "orgcode", nullable = false, columnDefinition = "UUID")
-    private UUID orgcode;
+    @Column(name = "orgcode", nullable = false)
+    private Long orgcode;
 
     @Column(name = "imap_host", length = 255)
     private String imapHost;
@@ -52,11 +52,11 @@ public class OrgEmailConfig {
     }
 
     // Getters and Setters
-    public UUID getOrgcode() {
+    public Long getOrgcode() {
         return orgcode;
     }
 
-    public void setOrgcode(UUID orgcode) {
+    public void setOrgcode(Long orgcode) {
         this.orgcode = orgcode;
     }
 

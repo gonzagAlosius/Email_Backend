@@ -109,7 +109,7 @@ public class AuthController {
                     if (config.getOrgcode() != null) {
                         configEntity.setOrgcode(config.getOrgcode());
                     } else {
-                        configEntity.setOrgcode(java.util.UUID.fromString("00000000-0000-0000-0000-000000000101"));
+                        configEntity.setOrgcode(101L);
                     }
                     configEntity.setUserId(java.util.UUID.randomUUID());
                     configEntity.setEmailAddress(loginRequest.getEmail());

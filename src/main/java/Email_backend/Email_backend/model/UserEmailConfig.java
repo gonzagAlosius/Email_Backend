@@ -12,8 +12,8 @@ public class UserEmailConfig {
     @Column(name = "mailbox_id", columnDefinition = "UUID")
     private UUID mailboxId;
 
-    @Column(name = "orgcode", nullable = false, columnDefinition = "UUID")
-    private UUID orgcode;
+    @Column(name = "orgcode", nullable = false)
+    private Long orgcode;
 
     @Column(name = "user_id", nullable = false, columnDefinition = "UUID")
     private UUID userId;
@@ -57,11 +57,11 @@ public class UserEmailConfig {
         this.mailboxId = mailboxId;
     }
 
-    public UUID getOrgcode() {
+    public Long getOrgcode() {
         return orgcode;
     }
 
-    public void setOrgcode(UUID orgcode) {
+    public void setOrgcode(Long orgcode) {
         this.orgcode = orgcode;
     }
 
