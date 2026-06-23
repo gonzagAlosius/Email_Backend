@@ -209,13 +209,31 @@ public class EmailReceiveService {
                 }
             }
         }
-        folder.open(Folder.READ_ONLY);
+        try {
+            folder.open(Folder.READ_WRITE);
+            System.out.println("DEBUG: IMAP folder " + folderName + " opened in READ_WRITE mode");
+        } catch (MessagingException e) {
+            System.err.println("WARNING: Failed to open IMAP folder " + folderName + " in READ_WRITE mode: " + e.getMessage());
+            e.printStackTrace();
+            folder.open(Folder.READ_ONLY);
+        }
 
         EmailResponse dto = new EmailResponse();
         if (folder instanceof com.sun.mail.imap.IMAPFolder) {
             com.sun.mail.imap.IMAPFolder imapFolder = (com.sun.mail.imap.IMAPFolder) folder;
             Message msg = imapFolder.getMessageByUID(uid);
             if (msg != null) {
+                if (folder.getMode() == Folder.READ_WRITE) {
+                    try {
+                        msg.setFlag(Flags.Flag.SEEN, true);
+                        System.out.println("DEBUG: Successfully marked message UID " + uid + " as SEEN");
+                    } catch (Exception ex) {
+                        System.err.println("Could not mark message as SEEN: " + ex.getMessage());
+                        ex.printStackTrace();
+                    }
+                } else {
+                    System.err.println("WARNING: Cannot set SEEN flag because folder " + folderName + " is in READ_ONLY mode");
+                }
                 dto.setUid(uid);
                 Address[] froms = msg.getFrom();
                 if (froms != null && froms.length > 0) {
