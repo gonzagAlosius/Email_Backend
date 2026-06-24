@@ -86,8 +86,16 @@ public class AuthController {
                 Store store = session.getStore("imaps");
                 store.connect(config.getImapHost(), loginRequest.getEmail(), resolvedPassword);
                 store.close();
+            } catch (javax.mail.AuthenticationFailedException authEx) {
+                System.err.println("Authentication failed for: " + loginRequest.getEmail() + " - " + authEx.getMessage());
+                throw authEx;
             } catch (Exception imapEx) {
-                System.out.println("Bypassing IMAP verification error for: " + loginRequest.getEmail() + " - " + imapEx.getMessage());
+                String msg = imapEx.getMessage() != null ? imapEx.getMessage().toLowerCase() : "";
+                if (msg.contains("authentication failed") || msg.contains("auth-status=3") || msg.contains("invalid credentials") || msg.contains("login failed")) {
+                    System.err.println("Authentication failed (inferred) for: " + loginRequest.getEmail() + " - " + imapEx.getMessage());
+                    throw imapEx;
+                }
+                System.out.println("Bypassing non-authentication IMAP verification error for: " + loginRequest.getEmail() + " - " + imapEx.getMessage());
             }
 
             // Save/Update credentials in the PostgreSQL database table mail102
