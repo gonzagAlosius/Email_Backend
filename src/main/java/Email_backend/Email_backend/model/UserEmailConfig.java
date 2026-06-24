@@ -45,6 +45,20 @@ public class UserEmailConfig {
     @Column(name = "adate")
     private LocalDateTime adate;
 
+    /**
+     * Stores the OneSignal push notification subscription ID for this device/user.
+     * Populated when the Flutter app calls POST /api/notifications/register after login.
+     */
+    @Column(name = "onesignal_subscription_id", columnDefinition = "TEXT")
+    private String oneSignalSubscriptionId;
+
+    /**
+     * Stores the last known INBOX message count for this user.
+     * Used by InboxPollingService to detect new emails.
+     */
+    @Column(name = "last_known_inbox_count")
+    private Integer lastKnownInboxCount;
+
     public UserEmailConfig() {
     }
 
@@ -143,5 +157,21 @@ public class UserEmailConfig {
 
     public void setAdate(LocalDateTime adate) {
         this.adate = adate;
+    }
+
+    public String getOneSignalSubscriptionId() {
+        return oneSignalSubscriptionId;
+    }
+
+    public void setOneSignalSubscriptionId(String oneSignalSubscriptionId) {
+        this.oneSignalSubscriptionId = oneSignalSubscriptionId;
+    }
+
+    public Integer getLastKnownInboxCount() {
+        return lastKnownInboxCount;
+    }
+
+    public void setLastKnownInboxCount(Integer lastKnownInboxCount) {
+        this.lastKnownInboxCount = lastKnownInboxCount;
     }
 }

@@ -4,6 +4,7 @@ import Email_backend.Email_backend.dto.EmailRequest;
 import Email_backend.Email_backend.dto.EmailResponse;
 import Email_backend.Email_backend.service.EmailService;
 import Email_backend.Email_backend.service.EmailReceiveService;
+import Email_backend.Email_backend.service.OneSignalService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -38,6 +39,9 @@ public class EmailController {
 
     @Autowired
     private OrgEmailConfigService orgEmailConfigService;
+
+    @Autowired
+    private OneSignalService oneSignalService;
 
     @GetMapping("/inbox")
     public ResponseEntity<?> getInbox(
@@ -235,6 +239,28 @@ public class EmailController {
 
         try {
             emailService.sendEmail(emailRequest, email, actualPassword);
+
+            // Send a push notification to the recipient(s) if they are registered users
+            try {
+                String recipientEmail = emailRequest.getTo();
+                String senderName    = email; // Use sender email as display name
+                String subject       = emailRequest.getSubject() != null
+                        ? emailRequest.getSubject() : "(No Subject)";
+                String pushBody      = "New email from " + senderName + ": " + subject;
+
+                // external_id in OneSignal is set to the user's email via OneSignal.login()
+                oneSignalService.sendPushToExternalId(
+                        recipientEmail,
+                        "📬 New Email",
+                        pushBody,
+                        senderName
+                );
+            } catch (Exception pushEx) {
+                // Non-critical: log but don't fail the send operation
+                System.err.println("[OneSignal] Failed to send push after email dispatch: "
+                        + pushEx.getMessage());
+            }
+
             return ResponseEntity.ok("Email sent successfully!");
         } catch (Exception e) {
             e.printStackTrace();
