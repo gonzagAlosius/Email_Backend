@@ -74,10 +74,12 @@ public class EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true); // true = multipart
 
             helper.setFrom(username);
-            helper.setTo(emailRequest.getTo());
+            if (emailRequest.getTo() != null && !emailRequest.getTo().isEmpty()) {
+                helper.setTo(javax.mail.internet.InternetAddress.parse(emailRequest.getTo(), false));
+            }
 
             if (emailRequest.getCc() != null && !emailRequest.getCc().isEmpty()) {
-                helper.setCc(emailRequest.getCc());
+                helper.setCc(javax.mail.internet.InternetAddress.parse(emailRequest.getCc(), false));
             }
 
             helper.setSubject(emailRequest.getSubject());

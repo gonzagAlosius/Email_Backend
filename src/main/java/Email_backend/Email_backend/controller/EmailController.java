@@ -248,13 +248,21 @@ public class EmailController {
                         ? emailRequest.getSubject() : "(No Subject)";
                 String pushBody      = "New email from " + senderName + ": " + subject;
 
-                // external_id in OneSignal is set to the user's email via OneSignal.login()
-                oneSignalService.sendPushToExternalId(
-                        recipientEmail,
-                        "📬 New Email",
-                        pushBody,
-                        senderName
-                );
+                if (recipientEmail != null && !recipientEmail.isEmpty()) {
+                    String[] recipients = recipientEmail.split("[,;]");
+                    for (String rec : recipients) {
+                        rec = rec.trim();
+                        if (!rec.isEmpty()) {
+                            // external_id in OneSignal is set to the user's email via OneSignal.login()
+                            oneSignalService.sendPushToExternalId(
+                                    rec,
+                                    "📬 New Email",
+                                    pushBody,
+                                    senderName
+                            );
+                        }
+                    }
+                }
             } catch (Exception pushEx) {
                 // Non-critical: log but don't fail the send operation
                 System.err.println("[OneSignal] Failed to send push after email dispatch: "
