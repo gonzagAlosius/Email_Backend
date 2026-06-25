@@ -28,7 +28,9 @@ public class CorsConfig {
             "Authorization", 
             "X-Requested-With", 
             "X-Internal-Call",
-            "Access-Control-Allow-Origin"
+            "Access-Control-Allow-Origin",
+            "X-Email",
+            "X-Password"
         ));
         
         // Allow standard HTTP methods
