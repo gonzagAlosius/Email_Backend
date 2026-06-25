@@ -11,7 +11,8 @@
 	<groupId>Email_backend</groupId>
 	<artifactId>Email_backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name/>
+	<name>emailservice</name>
+	<packaging>war</packaging>
 	<description/>
 	<url/>
 	<licenses>

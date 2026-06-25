@@ -61,7 +61,7 @@ public class NotificationController {
         }
 
         Optional<UserEmailConfig> configOpt = userEmailConfigRepository.findByEmailAddress(email);
-        if (configOpt.isEmpty()) {
+        if (!configOpt.isPresent()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("No user configuration found for email: " + email);
         }
