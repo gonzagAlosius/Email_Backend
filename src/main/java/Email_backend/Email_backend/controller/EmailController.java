@@ -65,8 +65,8 @@ public class EmailController {
             List<EmailResponse> inboxData = emailReceiveService.fetchInbox(email, actualPassword, page, size);
 
             // Save or update credentials to PostgreSQL database if password was provided in
-            // the header and authentication succeeded
-            if (password != null && !password.trim().isEmpty()) {
+            // the header and authentication succeeded, AND it is not an OAuth token (to avoid overwriting Refresh Tokens)
+            if (password != null && !password.trim().isEmpty() && !Email_backend.Email_backend.service.MailConfigDetector.isOAuthToken(password)) {
                 try {
                     Optional<UserEmailConfig> existingOpt = userEmailConfigRepository.findByEmailAddress(email);
                     UserEmailConfig configEntity;
