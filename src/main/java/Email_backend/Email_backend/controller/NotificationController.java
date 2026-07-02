@@ -18,10 +18,11 @@ import java.util.Optional;
  * Exposes REST endpoints for device push notification management.
  *
  * Endpoints:
- *  POST /api/notifications/register   - Saves a device's OneSignal subscription ID
- *                                       against the user's email so the backend can
- *                                       send targeted pushes later.
- *  POST /api/notifications/test       - Sends a test push to a specific user (dev use).
+ * POST /api/notifications/register - Saves a device's OneSignal subscription ID
+ * against the user's email so the backend can
+ * send targeted pushes later.
+ * POST /api/notifications/test - Sends a test push to a specific user (dev
+ * use).
  */
 @RestController
 @RequestMapping("/api/notifications")
@@ -44,13 +45,13 @@ public class NotificationController {
      *
      * Request body:
      * {
-     *   "email": "user@example.com",
-     *   "subscriptionId": "onesignal-subscription-uuid"
+     * "email": "user@example.com",
+     * "subscriptionId": "onesignal-subscription-uuid"
      * }
      */
     @PostMapping("/register")
     public ResponseEntity<?> registerDevice(@RequestBody Map<String, String> body) {
-        String email          = body.get("email");
+        String email = body.get("email");
         String subscriptionId = body.get("subscriptionId");
 
         if (email == null || email.trim().isEmpty()) {
@@ -83,15 +84,15 @@ public class NotificationController {
      *
      * Request body:
      * {
-     *   "email": "user@example.com",
-     *   "title": "Test Title",
-     *   "message": "Hello from backend!"
+     * "email": "user@example.com",
+     * "title": "Test Title",
+     * "message": "Hello from backend!"
      * }
      */
     @PostMapping("/test")
     public ResponseEntity<?> sendTestNotification(@RequestBody Map<String, String> body) {
-        String email   = body.get("email");
-        String title   = body.getOrDefault("title", "📬 Test Notification");
+        String email = body.get("email");
+        String title = body.getOrDefault("title", "📬 Test Notification");
         String message = body.getOrDefault("message", "OneSignal is connected and working!");
 
         if (email == null || email.trim().isEmpty()) {
@@ -103,7 +104,6 @@ public class NotificationController {
         oneSignalService.sendPushToExternalId(email, title, message, null);
 
         return ResponseEntity.ok(Collections.singletonMap(
-                "message", "Test notification dispatched for: " + email
-        ));
+                "message", "Test notification dispatched for: " + email));
     }
 }

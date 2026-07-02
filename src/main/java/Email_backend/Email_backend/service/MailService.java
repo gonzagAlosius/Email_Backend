@@ -47,7 +47,9 @@ public class MailService {
         Properties props = mailSender.getJavaMailProperties();
         props.put("mail.transport.protocol", "smtp");
         props.put("mail.smtp.auth", "true");
-        if (config.getSmtpSecure() != null && config.getSmtpSecure()) {
+
+        int port = config.getSmtpPort() != null ? Integer.parseInt(config.getSmtpPort()) : 587;
+        if (port == 465 || (config.getSmtpSecure() != null && config.getSmtpSecure() && port != 587)) {
             props.put("mail.smtp.ssl.enable", "true");
         } else {
             props.put("mail.smtp.starttls.enable", "true");
@@ -65,6 +67,55 @@ public class MailService {
         helper.setTo(to);
         helper.setSubject(subject);
         helper.setText(html, true);
+
+        mailSender.send(message);
+    }
+
+    public void sendEventInvite(String fromEmail, String password, String to, String subject, String text,
+            String icsContent) throws Exception {
+        if (fromEmail == null || password == null) {
+            System.err.println("Cannot send email: fromEmail or password is null.");
+            return;
+        }
+
+        MailConfigDetector.Config config = orgEmailConfigService.getMailConfig(fromEmail, password);
+
+        JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
+        mailSender.setHost(config.getSmtpHost());
+        if (config.getSmtpPort() != null) {
+            mailSender.setPort(Integer.parseInt(config.getSmtpPort()));
+        }
+        mailSender.setUsername(fromEmail);
+        mailSender.setPassword(password);
+
+        Properties props = mailSender.getJavaMailProperties();
+        props.put("mail.transport.protocol", "smtp");
+        props.put("mail.smtp.auth", "true");
+
+        int port = config.getSmtpPort() != null ? Integer.parseInt(config.getSmtpPort()) : 587;
+        if (port == 465 || (config.getSmtpSecure() != null && config.getSmtpSecure() && port != 587)) {
+            props.put("mail.smtp.ssl.enable", "true");
+        } else {
+            props.put("mail.smtp.starttls.enable", "true");
+            props.put("mail.smtp.starttls.required", "true");
+        }
+        props.put("mail.smtp.ssl.trust", config.getSmtpHost());
+        props.put("mail.smtp.connectiontimeout", "5000");
+        props.put("mail.smtp.timeout", "5000");
+        props.put("mail.smtp.writetimeout", "5000");
+
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+        helper.setFrom(fromEmail);
+        helper.setTo(to);
+        helper.setSubject(subject);
+        helper.setText(text);
+
+        helper.addAttachment(
+                "invite.ics",
+                new org.springframework.core.io.ByteArrayResource(icsContent.getBytes()),
+                "text/calendar");
 
         mailSender.send(message);
     }

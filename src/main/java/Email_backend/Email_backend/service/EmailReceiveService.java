@@ -28,7 +28,8 @@ public class EmailReceiveService {
         return fetchEmailsFromFolder("INBOX", username, resolvedPassword, config, page, size);
     }
 
-    public List<EmailResponse> fetchSentMessages(String username, String password, int page, int size) throws Exception {
+    public List<EmailResponse> fetchSentMessages(String username, String password, int page, int size)
+            throws Exception {
         String resolvedPassword = MailConfigDetector.resolvePassword(username, password);
         MailConfigDetector.Config config = orgEmailConfigService.getMailConfig(username, resolvedPassword);
         return fetchEmailsFromFolder(config.getSentFolder(), username, resolvedPassword, config, page, size);
@@ -213,7 +214,8 @@ public class EmailReceiveService {
             folder.open(Folder.READ_WRITE);
             System.out.println("DEBUG: IMAP folder " + folderName + " opened in READ_WRITE mode");
         } catch (MessagingException e) {
-            System.err.println("WARNING: Failed to open IMAP folder " + folderName + " in READ_WRITE mode: " + e.getMessage());
+            System.err.println(
+                    "WARNING: Failed to open IMAP folder " + folderName + " in READ_WRITE mode: " + e.getMessage());
             e.printStackTrace();
             folder.open(Folder.READ_ONLY);
         }
@@ -232,7 +234,8 @@ public class EmailReceiveService {
                         ex.printStackTrace();
                     }
                 } else {
-                    System.err.println("WARNING: Cannot set SEEN flag because folder " + folderName + " is in READ_ONLY mode");
+                    System.err.println(
+                            "WARNING: Cannot set SEEN flag because folder " + folderName + " is in READ_ONLY mode");
                 }
                 dto.setUid(uid);
                 Address[] froms = msg.getFrom();
@@ -469,7 +472,7 @@ public class EmailReceiveService {
                     + "<p>Thanks,<br/>Finance Department</p></div>");
             email2.setUid(1002L);
             email2.setIsRead(true);
-            
+
             EmailResponse.AttachmentResponse att = new EmailResponse.AttachmentResponse();
             att.setFileName("Q2_Statement.pdf");
             att.setContentType("application/pdf");
@@ -509,7 +512,7 @@ public class EmailReceiveService {
             email1.setContent("<div style='font-family: Arial, sans-serif; padding: 20px; color: #333;'>"
                     + "<p>Hi Client,</p>"
                     + "<p>I have attached the updated proposal. Please let us know if we can proceed with this layout.</p>"
-                    + "<p>Regards,<br/>Fazil</p></div>");
+                    + "<p>Regards,<br/>Sender</p></div>");
             email1.setUid(2001L);
             email1.setIsRead(true);
             list.add(email1);

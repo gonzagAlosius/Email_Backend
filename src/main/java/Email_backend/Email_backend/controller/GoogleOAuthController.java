@@ -38,8 +38,11 @@ public class GoogleOAuthController {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @GetMapping("/oauth/google/login")
-    public void login(@RequestParam(value = "redirect", required = false) String appRedirectUrl, HttpServletResponse response) throws Exception {
-        String state = appRedirectUrl != null ? Base64.getUrlEncoder().encodeToString(appRedirectUrl.getBytes(StandardCharsets.UTF_8)) : "";
+    public void login(@RequestParam(value = "redirect", required = false) String appRedirectUrl,
+            HttpServletResponse response) throws Exception {
+        String state = appRedirectUrl != null
+                ? Base64.getUrlEncoder().encodeToString(appRedirectUrl.getBytes(StandardCharsets.UTF_8))
+                : "";
         String authUrl = "https://accounts.google.com/o/oauth2/v2/auth" +
                 "?client_id=" + URLEncoder.encode(clientId, "UTF-8") +
                 "&redirect_uri=" + URLEncoder.encode(redirectUri, "UTF-8") +
@@ -51,29 +54,31 @@ public class GoogleOAuthController {
     }
 
     @GetMapping("/oauth/google/callback")
-    public void callback(@RequestParam("code") String code, @RequestParam(value = "state", required = false) String state, HttpServletResponse response) throws Exception {
+    public void callback(@RequestParam("code") String code,
+            @RequestParam(value = "state", required = false) String state, HttpServletResponse response)
+            throws Exception {
         String tokenEndpoint = "https://oauth2.googleapis.com/token";
-        
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-        
+
         String requestBody = "client_id=" + URLEncoder.encode(clientId, "UTF-8") +
                 "&client_secret=" + URLEncoder.encode(clientSecret, "UTF-8") +
                 "&code=" + URLEncoder.encode(code, "UTF-8") +
                 "&grant_type=authorization_code" +
                 "&redirect_uri=" + URLEncoder.encode(redirectUri, "UTF-8");
-                
+
         HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
         ResponseEntity<Map> tokenResponse = restTemplate.postForEntity(tokenEndpoint, entity, Map.class);
-        
+
         if (tokenResponse.getStatusCode() == HttpStatus.OK && tokenResponse.getBody() != null) {
             Map<String, Object> body = tokenResponse.getBody();
             String accessToken = (String) body.get("access_token");
             String refreshToken = (String) body.get("refresh_token");
             String idToken = (String) body.get("id_token");
-            
+
             String email = decodeEmailFromIdToken(idToken);
-            
+
             if (email != null && refreshToken != null) {
                 // save refresh token in db
                 Optional<UserEmailConfig> existing = userEmailConfigRepository.findByEmailAddress(email);
@@ -93,7 +98,7 @@ public class GoogleOAuthController {
                 configEntity.setEncryptedPassword(encryptionService.encrypt(refreshToken));
                 userEmailConfigRepository.save(configEntity);
             }
-            
+
             String flutterRedirectUrl = "/";
             if (state != null && !state.isEmpty()) {
                 try {
@@ -102,46 +107,47 @@ public class GoogleOAuthController {
                     flutterRedirectUrl = "/";
                 }
             }
-            
+
             // Append tokens to url so Flutter can extract and save them.
-            String finalUrl = flutterRedirectUrl + (flutterRedirectUrl.contains("?") ? "&" : "?") + 
-                "token=" + URLEncoder.encode(accessToken != null ? accessToken : "", "UTF-8") + 
-                "&email=" + URLEncoder.encode(email != null ? email : "", "UTF-8") + 
-                "&provider=google";
-                
+            String finalUrl = flutterRedirectUrl + (flutterRedirectUrl.contains("?") ? "&" : "?") +
+                    "token=" + URLEncoder.encode(accessToken != null ? accessToken : "", "UTF-8") +
+                    "&email=" + URLEncoder.encode(email != null ? email : "", "UTF-8") +
+                    "&provider=google";
+
             response.sendRedirect(finalUrl);
         } else {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Failed to exchange token with Google.");
         }
     }
-    
+
     @PostMapping("/api/auth/google/refresh")
     public ResponseEntity<?> refreshGoogleToken(@RequestBody Map<String, String> request) {
         String email = request.get("email");
         if (email == null || email.isEmpty()) {
             return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Email is required"));
         }
-        
+
         Optional<UserEmailConfig> configOpt = userEmailConfigRepository.findByEmailAddress(email);
         if (!configOpt.isPresent()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Collections.singletonMap("error", "User not found"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Collections.singletonMap("error", "User not found"));
         }
-        
+
         try {
             String refreshToken = encryptionService.decrypt(configOpt.get().getEncryptedPassword());
-            
+
             String tokenEndpoint = "https://oauth2.googleapis.com/token";
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-            
+
             String requestBody = "client_id=" + URLEncoder.encode(clientId, "UTF-8") +
                     "&client_secret=" + URLEncoder.encode(clientSecret, "UTF-8") +
                     "&refresh_token=" + URLEncoder.encode(refreshToken, "UTF-8") +
                     "&grant_type=refresh_token";
-                    
+
             HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
             ResponseEntity<Map> tokenResponse = restTemplate.postForEntity(tokenEndpoint, entity, Map.class);
-            
+
             if (tokenResponse.getStatusCode() == HttpStatus.OK && tokenResponse.getBody() != null) {
                 Map<String, Object> body = tokenResponse.getBody();
                 String newAccessToken = (String) body.get("access_token");
@@ -150,16 +156,19 @@ public class GoogleOAuthController {
                 res.put("email", email);
                 return ResponseEntity.ok(res);
             } else {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Collections.singletonMap("error", "Failed to refresh token"));
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Collections.singletonMap("error", "Failed to refresh token"));
             }
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Collections.singletonMap("error", "Error processing refresh token"));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Collections.singletonMap("error", "Error processing refresh token"));
         }
     }
 
     private String decodeEmailFromIdToken(String idToken) {
-        if (idToken == null) return null;
+        if (idToken == null)
+            return null;
         try {
             String[] parts = idToken.split("\\.");
             if (parts.length > 1) {

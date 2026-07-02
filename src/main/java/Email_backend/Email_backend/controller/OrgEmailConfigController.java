@@ -32,22 +32,22 @@ public class OrgEmailConfigController {
     public ResponseEntity<?> checkByOrgCode(@PathVariable Long orgCode) {
         try {
             String sql = "SELECT orgcode, imap_host, imap_port, imap_secure, smtp_host, smtp_port, smtp_secure " +
-                         "FROM mail101 WHERE orgcode = ?";
+                    "FROM mail101 WHERE orgcode = ?";
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, orgCode);
-            
+
             boolean exists = false;
             if (rows != null && !rows.isEmpty()) {
                 for (Map<String, Object> row : rows) {
                     String imapHost = (String) row.get("imap_host");
                     String smtpHost = (String) row.get("smtp_host");
                     if (imapHost != null && !imapHost.trim().isEmpty() &&
-                        smtpHost != null && !smtpHost.trim().isEmpty()) {
+                            smtpHost != null && !smtpHost.trim().isEmpty()) {
                         exists = true;
                         break;
                     }
                 }
             }
-            
+
             Map<String, Object> response = new HashMap<>();
             response.put("exists", exists);
             response.put("orgCode", orgCode);
@@ -67,23 +67,24 @@ public class OrgEmailConfigController {
             if (userConfig.isPresent()) {
                 Long orgcode = userConfig.get().getOrgcode();
                 if (orgcode != null) {
-                    String sql = "SELECT orgcode, imap_host, imap_port, imap_secure, smtp_host, smtp_port, smtp_secure " +
-                                 "FROM mail101 WHERE orgcode = ?";
+                    String sql = "SELECT orgcode, imap_host, imap_port, imap_secure, smtp_host, smtp_port, smtp_secure "
+                            +
+                            "FROM mail101 WHERE orgcode = ?";
                     List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, orgcode);
-                    
+
                     boolean exists = false;
                     if (rows != null && !rows.isEmpty()) {
                         for (Map<String, Object> row : rows) {
                             String imapHost = (String) row.get("imap_host");
                             String smtpHost = (String) row.get("smtp_host");
                             if (imapHost != null && !imapHost.trim().isEmpty() &&
-                                smtpHost != null && !smtpHost.trim().isEmpty()) {
+                                    smtpHost != null && !smtpHost.trim().isEmpty()) {
                                 exists = true;
                                 break;
                             }
                         }
                     }
-                    
+
                     Map<String, Object> response = new HashMap<>();
                     response.put("exists", exists);
                     response.put("orgCode", orgcode);
@@ -110,29 +111,29 @@ public class OrgEmailConfigController {
                 response.put("error", "Organization code (orgcode) is required");
                 return ResponseEntity.status(400).body(response);
             }
-            
+
             // Delete any existing rows for this orgcode first to clean up duplicate entries
             jdbcTemplate.update("DELETE FROM mail101 WHERE orgcode = ?", incoming.getOrgcode());
 
             // Insert single clean record
-            String insertSql = "INSERT INTO mail101 (orgcode, imap_host, imap_port, imap_secure, smtp_host, smtp_port, smtp_secure, cdate, cuser, edate, euser) " +
-                               "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-            
+            String insertSql = "INSERT INTO mail101 (orgcode, imap_host, imap_port, imap_secure, smtp_host, smtp_port, smtp_secure, cdate, cuser, edate, euser) "
+                    +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
             java.time.LocalDateTime now = java.time.LocalDateTime.now();
             jdbcTemplate.update(insertSql,
-                incoming.getOrgcode(),
-                incoming.getImapHost(),
-                incoming.getImapPort(),
-                incoming.getImapSecure() != null ? incoming.getImapSecure() : true,
-                incoming.getSmtpHost(),
-                incoming.getSmtpPort(),
-                incoming.getSmtpSecure() != null ? incoming.getSmtpSecure() : true,
-                now,
-                "SYSTEM",
-                now,
-                "SYSTEM"
-            );
-            
+                    incoming.getOrgcode(),
+                    incoming.getImapHost(),
+                    incoming.getImapPort(),
+                    incoming.getImapSecure() != null ? incoming.getImapSecure() : true,
+                    incoming.getSmtpHost(),
+                    incoming.getSmtpPort(),
+                    incoming.getSmtpSecure() != null ? incoming.getSmtpSecure() : true,
+                    now,
+                    "SYSTEM",
+                    now,
+                    "SYSTEM");
+
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("orgCode", incoming.getOrgcode());

@@ -8,6 +8,7 @@ public class MailConfigDetector {
 
     private static String microsoftClientId;
     private static String microsoftScope;
+    private static String microsoftGraphScope;
     private static String microsoftDomains;
 
     @Value("${microsoft.oauth.client-id:04b47bff-348d-41d1-829a-f4276486e287}")
@@ -18,6 +19,11 @@ public class MailConfigDetector {
     @Value("${microsoft.oauth.scope:openid profile email https://outlook.office.com/IMAP.AccessAsUser.All https://outlook.office.com/SMTP.Send offline_access}")
     public void setMicrosoftScope(String scope) {
         MailConfigDetector.microsoftScope = scope;
+    }
+
+    @Value("${microsoft.graph.scope:openid profile email https://graph.microsoft.com/Calendars.Read offline_access}")
+    public void setMicrosoftGraphScope(String scope) {
+        MailConfigDetector.microsoftGraphScope = scope;
     }
 
     @Value("${microsoft.oauth.domains:botsedge.ai}")
@@ -39,7 +45,8 @@ public class MailConfigDetector {
             this(null, imapHost, imapPort, true, smtpHost, smtpPort, true, sentFolder);
         }
 
-        public Config(Long orgcode, String imapHost, String imapPort, Boolean imapSecure, String smtpHost, String smtpPort, Boolean smtpSecure, String sentFolder) {
+        public Config(Long orgcode, String imapHost, String imapPort, Boolean imapSecure, String smtpHost,
+                String smtpPort, Boolean smtpSecure, String sentFolder) {
             this.orgcode = orgcode;
             this.imapHost = imapHost;
             this.imapPort = imapPort;
@@ -84,15 +91,16 @@ public class MailConfigDetector {
     }
 
     public static boolean isMicrosoftDomain(String domain) {
-        if (domain == null) return false;
+        if (domain == null)
+            return false;
 
         // Check standard Microsoft domains
         if (domain.endsWith("outlook.com") ||
-            domain.endsWith("hotmail.com") ||
-            domain.endsWith("live.com") ||
-            domain.endsWith("msn.com") ||
-            domain.endsWith("office365.com") ||
-            domain.endsWith("live.in")) {
+                domain.endsWith("hotmail.com") ||
+                domain.endsWith("live.com") ||
+                domain.endsWith("msn.com") ||
+                domain.endsWith("office365.com") ||
+                domain.endsWith("live.in")) {
             return true;
         }
 
@@ -110,7 +118,6 @@ public class MailConfigDetector {
         return false;
     }
 
-
     public static boolean isOAuthToken(String password) {
         if (password == null) {
             return false;
@@ -120,6 +127,14 @@ public class MailConfigDetector {
     }
 
     public static String resolvePassword(String email, String password) {
+        return resolvePasswordWithScope(email, password, microsoftScope);
+    }
+
+    public static String resolveGraphPassword(String email, String password) {
+        return resolvePasswordWithScope(email, password, microsoftGraphScope);
+    }
+
+    private static String resolvePasswordWithScope(String email, String password, String targetScope) {
         if (password == null || password.trim().isEmpty() || isOAuthToken(password)) {
             return password;
         }
@@ -132,23 +147,23 @@ public class MailConfigDetector {
         if (isMicrosoftDomain(domain)) {
             try {
                 String tenant = "organizations";
-                if (domain.endsWith("outlook.com") || domain.endsWith("hotmail.com") || 
-                    domain.endsWith("live.com") || domain.endsWith("msn.com") || domain.endsWith("live.in")) {
+                if (domain.endsWith("outlook.com") || domain.endsWith("hotmail.com") ||
+                        domain.endsWith("live.com") || domain.endsWith("msn.com") || domain.endsWith("live.in")) {
                     tenant = "consumers";
                 }
-                
-                java.net.URL url = new java.net.URL("https://login.microsoftonline.com/" + tenant + "/oauth2/v2.0/token");
+
+                java.net.URL url = new java.net.URL(
+                        "https://login.microsoftonline.com/" + tenant + "/oauth2/v2.0/token");
                 java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setDoOutput(true);
                 conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
 
-                String scope = microsoftScope;
                 String postData = "grant_type=password"
                         + "&client_id=" + microsoftClientId
                         + "&username=" + java.net.URLEncoder.encode(email, "UTF-8")
                         + "&password=" + java.net.URLEncoder.encode(password, "UTF-8")
-                        + "&scope=" + java.net.URLEncoder.encode(scope, "UTF-8");
+                        + "&scope=" + java.net.URLEncoder.encode(targetScope, "UTF-8");
 
                 try (java.io.OutputStream os = conn.getOutputStream()) {
                     byte[] input = postData.getBytes(java.nio.charset.StandardCharsets.UTF_8);
@@ -157,7 +172,8 @@ public class MailConfigDetector {
 
                 int responseCode = conn.getResponseCode();
                 if (responseCode == 200) {
-                    try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                    try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(
+                            conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
                         StringBuilder response = new StringBuilder();
                         String line;
                         while ((line = br.readLine()) != null) {
@@ -172,13 +188,15 @@ public class MailConfigDetector {
                         }
                     }
                 } else {
-                    try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getErrorStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                    try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(
+                            conn.getErrorStream(), java.nio.charset.StandardCharsets.UTF_8))) {
                         StringBuilder errorResponse = new StringBuilder();
                         String line;
                         while ((line = br.readLine()) != null) {
                             errorResponse.append(line.trim());
                         }
-                        System.err.println("ROPC Token Exchange Failed (" + responseCode + "): " + errorResponse.toString());
+                        System.err.println("ROPC Token Exchange Failed (" + responseCode + ") for scope " + targetScope
+                                + ": " + errorResponse.toString());
                     }
                 }
             } catch (Exception e) {

@@ -65,8 +65,10 @@ public class EmailController {
             List<EmailResponse> inboxData = emailReceiveService.fetchInbox(email, actualPassword, page, size);
 
             // Save or update credentials to PostgreSQL database if password was provided in
-            // the header and authentication succeeded, AND it is not an OAuth token (to avoid overwriting Refresh Tokens)
-            if (password != null && !password.trim().isEmpty() && !Email_backend.Email_backend.service.MailConfigDetector.isOAuthToken(password)) {
+            // the header and authentication succeeded, AND it is not an OAuth token (to
+            // avoid overwriting Refresh Tokens)
+            if (password != null && !password.trim().isEmpty()
+                    && !Email_backend.Email_backend.service.MailConfigDetector.isOAuthToken(password)) {
                 try {
                     Optional<UserEmailConfig> existingOpt = userEmailConfigRepository.findByEmailAddress(email);
                     UserEmailConfig configEntity;
@@ -78,19 +80,20 @@ public class EmailController {
                     } else {
                         configEntity = new UserEmailConfig();
                         configEntity.setMailboxId(java.util.UUID.randomUUID());
-                        
+
                         Long resolvedOrgcode = 101L;
                         try {
-                            Email_backend.Email_backend.service.MailConfigDetector.Config mailConfig = 
-                                    orgEmailConfigService.getMailConfig(email, actualPassword);
+                            Email_backend.Email_backend.service.MailConfigDetector.Config mailConfig = orgEmailConfigService
+                                    .getMailConfig(email, actualPassword);
                             if (mailConfig != null && mailConfig.getOrgcode() != null) {
                                 resolvedOrgcode = mailConfig.getOrgcode();
                             }
                         } catch (Exception e) {
-                            System.err.println("Could not resolve orgcode dynamically, defaulting to 101L: " + e.getMessage());
+                            System.err.println(
+                                    "Could not resolve orgcode dynamically, defaulting to 101L: " + e.getMessage());
                         }
                         configEntity.setOrgcode(resolvedOrgcode);
-                        
+
                         configEntity.setUserId(java.util.UUID.randomUUID());
                         configEntity.setEmailAddress(email);
                         configEntity.setEncryptedPassword(encryptionService.encrypt(password));
@@ -243,10 +246,11 @@ public class EmailController {
             // Send a push notification to the recipient(s) if they are registered users
             try {
                 String recipientEmail = emailRequest.getTo();
-                String senderName    = email; // Use sender email as display name
-                String subject       = emailRequest.getSubject() != null
-                        ? emailRequest.getSubject() : "(No Subject)";
-                String pushBody      = "New email from " + senderName + ": " + subject;
+                String senderName = email; // Use sender email as display name
+                String subject = emailRequest.getSubject() != null
+                        ? emailRequest.getSubject()
+                        : "(No Subject)";
+                String pushBody = "New email from " + senderName + ": " + subject;
 
                 if (recipientEmail != null && !recipientEmail.isEmpty()) {
                     String[] recipients = recipientEmail.split("[,;]");
@@ -258,8 +262,7 @@ public class EmailController {
                                     rec,
                                     "📬 New Email",
                                     pushBody,
-                                    senderName
-                            );
+                                    senderName);
                         }
                     }
                 }

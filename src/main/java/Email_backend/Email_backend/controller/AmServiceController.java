@@ -32,13 +32,15 @@ public class AmServiceController {
     private final RestTemplate restTemplate = new RestTemplate();
 
     private java.util.UUID convertOrgCodeToUuid(Number orgCode) {
-        if (orgCode == null) return null;
+        if (orgCode == null)
+            return null;
         String formatted = String.format("%012d", orgCode.longValue());
         return java.util.UUID.fromString(uuidPrefix + formatted);
     }
 
     private java.util.UUID convertUserScdToUuid(String userScd) {
-        if (userScd == null) return null;
+        if (userScd == null)
+            return null;
         try {
             return java.util.UUID.fromString(userScd);
         } catch (Exception e) {
@@ -48,14 +50,14 @@ public class AmServiceController {
 
     @PostMapping("/exchange-token")
     public ResponseEntity<?> exchangeToken(@RequestHeader("Authorization") String authHeader,
-                                           @RequestBody(required = false) Map<String, Object> body) {
+            @RequestBody(required = false) Map<String, Object> body) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Authorization header missing or invalid");
         }
 
         try {
             String url = accessManagerBaseUrl + "/exchange/exchange-token";
-            
+
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.set("Authorization", authHeader);
@@ -75,8 +77,9 @@ public class AmServiceController {
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
             ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
-            
-            // Sync/Upsert UserEmailConfig in mail102 if response is 200 and has session_data
+
+            // Sync/Upsert UserEmailConfig in mail102 if response is 200 and has
+            // session_data
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
                 Map bodyMap = response.getBody();
                 if (bodyMap.containsKey("session_data")) {
@@ -84,7 +87,7 @@ public class AmServiceController {
                     String email = (String) sessionData.get("email");
                     Object orgCodeObj = sessionData.get("orgCode");
                     String userScd = (String) sessionData.get("userScd");
-                    
+
                     if (email != null && !email.trim().isEmpty()) {
                         try {
                             Number orgCode = null;
@@ -93,11 +96,12 @@ public class AmServiceController {
                             } else if (orgCodeObj instanceof String) {
                                 orgCode = Long.parseLong((String) orgCodeObj);
                             }
-                            
+
                             Long orgUuid = orgCode != null ? orgCode.longValue() : null;
                             java.util.UUID userUuid = convertUserScdToUuid(userScd);
-                            
-                            java.util.Optional<UserEmailConfig> existingOpt = userEmailConfigRepository.findByEmailAddress(email);
+
+                            java.util.Optional<UserEmailConfig> existingOpt = userEmailConfigRepository
+                                    .findByEmailAddress(email);
                             UserEmailConfig configEntity;
                             if (existingOpt.isPresent()) {
                                 configEntity = existingOpt.get();
@@ -115,7 +119,8 @@ public class AmServiceController {
                                 configEntity.setOrgcode(orgUuid != null ? orgUuid : 101L);
                                 configEntity.setUserId(userUuid != null ? userUuid : java.util.UUID.randomUUID());
                                 configEntity.setEmailAddress(email);
-                                configEntity.setEncryptedPassword(""); // Empty password initially, will be set on direct login or OAuth use
+                                configEntity.setEncryptedPassword(""); // Empty password initially, will be set on
+                                                                       // direct login or OAuth use
                                 configEntity.setIsActive(true);
                                 configEntity.setCdate(java.time.LocalDateTime.now());
                                 configEntity.setCuser("system");
@@ -123,13 +128,14 @@ public class AmServiceController {
                             userEmailConfigRepository.save(configEntity);
                             System.out.println("Synced UserEmailConfig orgcode & userId for: " + email);
                         } catch (Exception syncEx) {
-                            System.err.println("Failed to sync UserEmailConfig during exchange-token: " + syncEx.getMessage());
+                            System.err.println(
+                                    "Failed to sync UserEmailConfig during exchange-token: " + syncEx.getMessage());
                             syncEx.printStackTrace();
                         }
                     }
                 }
             }
-            
+
             return ResponseEntity.status(response.getStatusCode()).body(response.getBody());
         } catch (Exception e) {
             e.printStackTrace();
@@ -142,17 +148,17 @@ public class AmServiceController {
 
     @PostMapping("/user-sync")
     public ResponseEntity<?> syncUser(@RequestHeader("Authorization") String authHeader,
-                                      @RequestBody Map<String, Object> body) {
+            @RequestBody Map<String, Object> body) {
         return proxyPost("/user/get-user", authHeader, body);
     }
 
     @GetMapping("/get-user")
     public ResponseEntity<?> getUser(@RequestHeader("Authorization") String authHeader,
-                                     @RequestParam String userCode,
-                                     @RequestParam Long orgCode) {
+            @RequestParam String userCode,
+            @RequestParam Long orgCode) {
         try {
             String url = accessManagerBaseUrl + "/user/get-user?userCode=" + userCode + "&orgCode=" + orgCode;
-            
+
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.set("Authorization", authHeader);
@@ -169,34 +175,34 @@ public class AmServiceController {
 
     @PostMapping("/organization-sync")
     public ResponseEntity<?> syncOrganization(@RequestHeader("Authorization") String authHeader,
-                                              @RequestBody Map<String, Object> body) {
+            @RequestBody Map<String, Object> body) {
         return proxyPost("/organization/get-organization", authHeader, body);
     }
 
     @PostMapping("/products-sync")
     public ResponseEntity<?> syncProducts(@RequestHeader("Authorization") String authHeader,
-                                          @RequestBody Map<String, Object> body) {
+            @RequestBody Map<String, Object> body) {
         return proxyPost("/product/get-products", authHeader, body);
     }
 
     @PostMapping("/branches-sync")
     public ResponseEntity<?> syncBranches(@RequestHeader("Authorization") String authHeader,
-                                          @RequestBody Map<String, Object> body) {
+            @RequestBody Map<String, Object> body) {
         return proxyPost("/branch/get-branches", authHeader, body);
     }
 
     @PostMapping("/reset-password/{userScd}/{orgCode}")
     public ResponseEntity<?> resetPassword(@RequestHeader("Authorization") String authHeader,
-                                           @PathVariable String userScd,
-                                           @PathVariable Long orgCode,
-                                           @RequestBody Map<String, Object> body) {
+            @PathVariable String userScd,
+            @PathVariable Long orgCode,
+            @RequestBody Map<String, Object> body) {
         return proxyPost("/auth/reset-password/" + userScd + "/" + orgCode, authHeader, body);
     }
 
     private ResponseEntity<?> proxyPost(String path, String authHeader, Map<String, Object> body) {
         try {
             String url = accessManagerBaseUrl + path;
-            
+
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             if (authHeader != null) {
