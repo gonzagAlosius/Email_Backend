@@ -47,7 +47,7 @@ public class GoogleOAuthController {
                 "?client_id=" + URLEncoder.encode(clientId, "UTF-8") +
                 "&redirect_uri=" + URLEncoder.encode(redirectUri, "UTF-8") +
                 "&response_type=code" +
-                "&scope=" + URLEncoder.encode("openid email profile https://mail.google.com/", "UTF-8") +
+                "&scope=" + URLEncoder.encode("openid email profile https://mail.google.com/ https://www.googleapis.com/auth/calendar", "UTF-8") +
                 "&access_type=offline" +
                 "&state=" + state;
         response.sendRedirect(authUrl);

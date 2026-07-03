@@ -118,6 +118,14 @@ public class MailConfigDetector {
         return false;
     }
 
+    public static boolean isGoogleDomain(String domain) {
+        if (domain == null)
+            return false;
+
+        domain = domain.toLowerCase().trim();
+        return domain.endsWith("gmail.com") || domain.endsWith("googlemail.com");
+    }
+
     public static boolean isOAuthToken(String password) {
         if (password == null) {
             return false;

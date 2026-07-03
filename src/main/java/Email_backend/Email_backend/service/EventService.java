@@ -25,6 +25,9 @@ public class EventService {
     @Autowired
     private MicrosoftGraphService microsoftGraphService;
 
+    @Autowired
+    private GoogleCalendarService googleCalendarService;
+
     public void createEvent(EventRequest req, String email, String password) {
         req.setTeamsMeeting(true);
 
@@ -74,6 +77,14 @@ public class EventService {
                         repo.save(event);
                     }
                 }
+            } else if (MailConfigDetector.isGoogleDomain(domain)) {
+                if (password != null && MailConfigDetector.isOAuthToken(password)) {
+                    String googleId = googleCalendarService.createCalendarEvent(password, req);
+                    if (googleId != null) {
+                        event.setGraphEventId(googleId);
+                        repo.save(event);
+                    }
+                }
             }
         }
     }
@@ -105,6 +116,10 @@ public class EventService {
                 if (graphToken != null && MailConfigDetector.isOAuthToken(graphToken)) {
                     microsoftGraphService.updateCalendarEvent(graphToken, event.getGraphEventId(), req);
                 }
+            } else if (MailConfigDetector.isGoogleDomain(domain)) {
+                if (password != null && MailConfigDetector.isOAuthToken(password)) {
+                    googleCalendarService.updateCalendarEvent(password, event.getGraphEventId(), req);
+                }
             }
         }
     }
@@ -118,6 +133,10 @@ public class EventService {
                 String graphToken = MailConfigDetector.resolveGraphPassword(email, password);
                 if (graphToken != null && MailConfigDetector.isOAuthToken(graphToken)) {
                     microsoftGraphService.deleteCalendarEvent(graphToken, event.getGraphEventId());
+                }
+            } else if (MailConfigDetector.isGoogleDomain(domain)) {
+                if (password != null && MailConfigDetector.isOAuthToken(password)) {
+                    googleCalendarService.deleteCalendarEvent(password, event.getGraphEventId());
                 }
             }
         }
@@ -164,8 +183,22 @@ public class EventService {
                 } else {
                     System.out.println("[DEBUG] Failed to obtain Graph token or token is invalid.");
                 }
+            } else if (MailConfigDetector.isGoogleDomain(domain)) {
+                System.out.println("[DEBUG] It is a Google domain. Fetching events...");
+                if (password != null && MailConfigDetector.isOAuthToken(password)) {
+                    List<Event> googleEvents = googleCalendarService.fetchCalendarEvents(password);
+                    System.out.println("[DEBUG] Fetched " + googleEvents.size() + " events from Google Calendar.");
+                    for (Event ge : googleEvents) {
+                        if (ge.getGraphEventId() != null && graphIdToLocalEvent.containsKey(ge.getGraphEventId())) {
+                            continue;
+                        }
+                        allEvents.add(ge);
+                    }
+                } else {
+                    System.out.println("[DEBUG] Failed to obtain Google token or token is invalid.");
+                }
             } else {
-                System.out.println("[DEBUG] Not a Microsoft domain.");
+                System.out.println("[DEBUG] Not a Microsoft or Google domain.");
             }
         } else {
             System.out.println("[DEBUG] Email or password is null. Email=" + email + ", Password=" + (password != null ? "***" : "null"));
@@ -181,6 +214,10 @@ public class EventService {
                 String graphToken = MailConfigDetector.resolveGraphPassword(email, password);
                 if (graphToken != null && MailConfigDetector.isOAuthToken(graphToken)) {
                     return microsoftGraphService.fetchCalendarEventById(graphToken, graphEventId);
+                }
+            } else if (MailConfigDetector.isGoogleDomain(domain)) {
+                if (password != null && MailConfigDetector.isOAuthToken(password)) {
+                    return googleCalendarService.fetchCalendarEventById(password, graphEventId);
                 }
             }
         }
