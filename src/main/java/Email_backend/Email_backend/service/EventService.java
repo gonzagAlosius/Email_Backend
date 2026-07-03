@@ -26,6 +26,7 @@ public class EventService {
     private MicrosoftGraphService microsoftGraphService;
 
     public void createEvent(EventRequest req, String email, String password) {
+        req.setTeamsMeeting(true);
 
         // 1. Save in DB
         Event event = new Event();
@@ -36,7 +37,7 @@ public class EventService {
         event.setEndTime(req.getEndTime());
         event.setRecurrence(req.getRecurrence());
         event.setAllDay(req.isAllDay());
-        event.setTeamsMeeting(req.isTeamsMeeting());
+        event.setTeamsMeeting(true);
         event.setAgenda(req.getAgenda());
         event.setCategories(req.getCategories());
         event.setReminder(req.getReminder());
@@ -48,7 +49,7 @@ public class EventService {
         repo.save(event);
 
         // 2. Generate ICS
-        String ics = icsService.generate(req);
+        String ics = icsService.generate(req, email);
 
         // 3. Send email to all attendees
         if (req.getAttendees() != null && email != null && password != null) {
@@ -78,6 +79,7 @@ public class EventService {
     }
 
     public void updateEvent(Long id, EventRequest req, String email, String password) {
+        req.setTeamsMeeting(true);
         Event event = repo.findById(id).orElseThrow(() -> new RuntimeException("Event not found"));
         event.setTitle(req.getTitle());
         event.setDescription(req.getDescription());
@@ -86,7 +88,7 @@ public class EventService {
         event.setEndTime(req.getEndTime());
         event.setRecurrence(req.getRecurrence());
         event.setAllDay(req.isAllDay());
-        event.setTeamsMeeting(req.isTeamsMeeting());
+        event.setTeamsMeeting(true);
         event.setAgenda(req.getAgenda());
         event.setCategories(req.getCategories());
         event.setReminder(req.getReminder());

@@ -105,17 +105,39 @@ public class MailService {
         props.put("mail.smtp.writetimeout", "5000");
 
         MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+        
+        message.setFrom(new javax.mail.internet.InternetAddress(fromEmail));
+        message.setRecipient(javax.mail.Message.RecipientType.TO, new javax.mail.internet.InternetAddress(to));
+        message.setSubject(subject);
 
-        helper.setFrom(fromEmail);
-        helper.setTo(to);
-        helper.setSubject(subject);
-        helper.setText(text);
+        // Multipart alternative for inline body and calendar rendering
+        javax.mail.internet.MimeMultipart alternativeMultipart = new javax.mail.internet.MimeMultipart("alternative");
 
-        helper.addAttachment(
-                "invite.ics",
-                new org.springframework.core.io.ByteArrayResource(icsContent.getBytes()),
-                "text/calendar");
+        // Body message part
+        javax.mail.internet.MimeBodyPart textPart = new javax.mail.internet.MimeBodyPart();
+        textPart.setContent(text, "text/html; charset=utf-8");
+        alternativeMultipart.addBodyPart(textPart);
+
+        // Calendar invitation inline part
+        javax.mail.internet.MimeBodyPart calendarPart = new javax.mail.internet.MimeBodyPart();
+        calendarPart.addHeader("Content-Class", "urn:content-classes:calendarmessage");
+        calendarPart.setContent(icsContent, "text/calendar; method=REQUEST; charset=UTF-8");
+        alternativeMultipart.addBodyPart(calendarPart);
+
+        // Multipart mixed to contain both the inline rendering and the attachment
+        javax.mail.internet.MimeMultipart mixedMultipart = new javax.mail.internet.MimeMultipart("mixed");
+        
+        javax.mail.internet.MimeBodyPart mainBodyPart = new javax.mail.internet.MimeBodyPart();
+        mainBodyPart.setContent(alternativeMultipart);
+        mixedMultipart.addBodyPart(mainBodyPart);
+
+        // Attachment part
+        javax.mail.internet.MimeBodyPart attachmentPart = new javax.mail.internet.MimeBodyPart();
+        attachmentPart.setFileName("invite.ics");
+        attachmentPart.setContent(icsContent, "text/calendar; method=REQUEST; name=\"invite.ics\"");
+        mixedMultipart.addBodyPart(attachmentPart);
+
+        message.setContent(mixedMultipart);
 
         mailSender.send(message);
     }

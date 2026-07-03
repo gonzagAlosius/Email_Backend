@@ -33,7 +33,7 @@ import Email_backend.Email_backend.model.UserEmailConfig;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*")
+@CrossOrigin
 public class AuthController {
 
     @Autowired
@@ -57,6 +57,7 @@ public class AuthController {
     @Value("${cpanel.token:}")
     private String cpanelToken;
 
+    @CrossOrigin(origins = "*")
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
         Map<String, String> response = new HashMap<>();

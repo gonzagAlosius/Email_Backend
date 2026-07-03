@@ -16,7 +16,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/org-config")
-@CrossOrigin(origins = "*")
+@CrossOrigin
 public class OrgEmailConfigController {
 
     @Autowired

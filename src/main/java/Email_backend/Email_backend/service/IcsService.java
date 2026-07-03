@@ -12,7 +12,7 @@ import java.util.UUID;
 @Service
 public class IcsService {
 
-    public String generate(EventRequest req) {
+    public String generate(EventRequest req, String organizerEmail) {
 
         DateTimeFormatter f =
             DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'");
@@ -50,6 +50,24 @@ public class IcsService {
             }
         }
 
+        StringBuilder attendeesBuilder = new StringBuilder();
+        if (req.getAttendees() != null) {
+            for (String attendee : req.getAttendees()) {
+                if (attendee != null && !attendee.trim().isEmpty()) {
+                    attendeesBuilder.append("ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE;CN=")
+                                    .append(attendee)
+                                    .append(":mailto:")
+                                    .append(attendee)
+                                    .append("\r\n");
+                }
+            }
+        }
+
+        String organizerLine = "";
+        if (organizerEmail != null && !organizerEmail.trim().isEmpty()) {
+            organizerLine = "ORGANIZER;CN=" + organizerEmail + ":mailto:" + organizerEmail + "\r\n";
+        }
+
         return "BEGIN:VCALENDAR\r\n" +
                 "VERSION:2.0\r\n" +
                 "PRODID:-//Calendar App//EN\r\n" +
@@ -62,6 +80,8 @@ public class IcsService {
                 "SUMMARY:" + req.getTitle() + "\r\n" +
                 "DESCRIPTION:" + req.getDescription() + "\r\n" +
                 "LOCATION:" + req.getLocation() + "\r\n" +
+                organizerLine +
+                attendeesBuilder.toString() +
                 rrule +
                 "END:VEVENT\r\n" +
                 "END:VCALENDAR";

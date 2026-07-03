@@ -22,7 +22,7 @@ import java.util.Base64;
 
 @RestController
 @RequestMapping("/api/email")
-@CrossOrigin(origins = "*")
+@CrossOrigin
 public class EmailController {
 
     @Autowired

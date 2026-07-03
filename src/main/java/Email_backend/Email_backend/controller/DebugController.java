@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/debug")
-@CrossOrigin(origins = "*")
+@CrossOrigin
 public class DebugController {
 
   @Autowired
