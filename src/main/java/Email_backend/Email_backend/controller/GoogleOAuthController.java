@@ -49,6 +49,7 @@ public class GoogleOAuthController {
                 "&response_type=code" +
                 "&scope=" + URLEncoder.encode("openid email profile https://mail.google.com/ https://www.googleapis.com/auth/calendar", "UTF-8") +
                 "&access_type=offline" +
+                "&prompt=" + URLEncoder.encode("consent select_account", "UTF-8") +
                 "&state=" + state;
         response.sendRedirect(authUrl);
     }
@@ -75,9 +76,19 @@ public class GoogleOAuthController {
             Map<String, Object> body = tokenResponse.getBody();
             String accessToken = (String) body.get("access_token");
             String refreshToken = (String) body.get("refresh_token");
-            String idToken = (String) body.get("id_token");
-
-            String email = decodeEmailFromIdToken(idToken);
+            String email = null;
+            try {
+                String userInfoUrl = "https://www.googleapis.com/oauth2/v2/userinfo";
+                HttpHeaders uiHeaders = new HttpHeaders();
+                uiHeaders.setBearerAuth(accessToken);
+                HttpEntity<String> uiEntity = new HttpEntity<>("", uiHeaders);
+                ResponseEntity<Map> uiResponse = restTemplate.exchange(userInfoUrl, HttpMethod.GET, uiEntity, Map.class);
+                if (uiResponse.getStatusCode() == HttpStatus.OK && uiResponse.getBody() != null) {
+                    email = (String) uiResponse.getBody().get("email");
+                }
+            } catch (Exception e) {
+                System.err.println("Failed to fetch Google UserInfo: " + e.getMessage());
+            }
 
             if (email != null && refreshToken != null) {
                 // save refresh token in db

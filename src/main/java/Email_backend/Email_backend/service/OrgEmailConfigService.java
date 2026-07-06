@@ -126,9 +126,6 @@ public class OrgEmailConfigService {
         if (configs == null || configs.isEmpty()) {
             return null;
         }
-        if (configs.size() == 1) {
-            return configs.get(0);
-        }
 
         String domain = email.substring(email.indexOf("@") + 1).toLowerCase().trim();
 
@@ -171,7 +168,6 @@ public class OrgEmailConfigService {
             }
         }
 
-        // Hard fallback: just return the first configuration
-        return configs.get(0);
+        return null;
     }
 }
