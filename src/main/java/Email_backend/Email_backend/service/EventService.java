@@ -28,6 +28,9 @@ public class EventService {
     @Autowired
     private GoogleCalendarService googleCalendarService;
 
+    @Autowired
+    private BluehostCalendarService bluehostCalendarService;
+
     public void createEvent(EventRequest req, String email, String password) {
         req.setTeamsMeeting(true);
 
@@ -85,6 +88,12 @@ public class EventService {
                         repo.save(event);
                     }
                 }
+            } else {
+                String bhId = bluehostCalendarService.createCalendarEvent(email, password, req, null);
+                if (bhId != null) {
+                    event.setGraphEventId(bhId);
+                    repo.save(event);
+                }
             }
         }
     }
@@ -120,6 +129,9 @@ public class EventService {
                 if (password != null && MailConfigDetector.isOAuthToken(password)) {
                     googleCalendarService.updateCalendarEvent(password, event.getGraphEventId(), req);
                 }
+            } else {
+                String existingUuid = event.getGraphEventId().startsWith("bluehost_") ? event.getGraphEventId().substring(9) : event.getGraphEventId();
+                bluehostCalendarService.createCalendarEvent(email, password, req, existingUuid);
             }
         }
     }
@@ -138,6 +150,8 @@ public class EventService {
                 if (password != null && MailConfigDetector.isOAuthToken(password)) {
                     googleCalendarService.deleteCalendarEvent(password, event.getGraphEventId());
                 }
+            } else {
+                bluehostCalendarService.deleteCalendarEvent(email, password, event.getGraphEventId());
             }
         }
         
@@ -198,7 +212,15 @@ public class EventService {
                     System.out.println("[DEBUG] Failed to obtain Google token or token is invalid.");
                 }
             } else {
-                System.out.println("[DEBUG] Not a Microsoft or Google domain.");
+                System.out.println("[DEBUG] Not a Microsoft or Google domain. Trying Bluehost CalDAV...");
+                List<Event> bluehostEvents = bluehostCalendarService.fetchCalendarEvents(email, password);
+                System.out.println("[DEBUG] Fetched " + bluehostEvents.size() + " events from Bluehost CalDAV.");
+                for (Event ge : bluehostEvents) {
+                    if (ge.getGraphEventId() != null && graphIdToLocalEvent.containsKey(ge.getGraphEventId())) {
+                        continue;
+                    }
+                    allEvents.add(ge);
+                }
             }
         } else {
             System.out.println("[DEBUG] Email or password is null. Email=" + email + ", Password=" + (password != null ? "***" : "null"));
