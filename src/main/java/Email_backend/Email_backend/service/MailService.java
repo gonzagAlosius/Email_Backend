@@ -24,8 +24,11 @@ public class MailService {
     @Autowired
     private EncryptionService encryptionService;
 
+    @org.springframework.beans.factory.annotation.Value("${email.default-sender:amit@testingmail.duckdns.org}")
+    private String defaultSender;
+
     public void sendHtmlMail(String to, String subject, String html) throws Exception {
-        String fromEmail = "amit@testingmail.duckdns.org";
+        String fromEmail = defaultSender;
 
         String password = null;
         Optional<UserEmailConfig> userConfigOpt = userEmailConfigRepository.findByEmailAddress(fromEmail);
@@ -73,20 +76,31 @@ public class MailService {
 
     public void sendEventInvite(String fromEmail, String password, String to, String subject, String text,
             String icsContent) throws Exception {
-        if (fromEmail == null || password == null) {
-            System.err.println("Cannot send email: fromEmail or password is null.");
-            return;
+        
+        String actualFromEmail = fromEmail;
+        String actualPassword = password;
+
+        if (actualPassword == null) {
+            // Fallback to default sender if password is not available
+            actualFromEmail = defaultSender;
+            Optional<UserEmailConfig> userConfigOpt = userEmailConfigRepository.findByEmailAddress(actualFromEmail);
+            if (userConfigOpt.isPresent()) {
+                actualPassword = encryptionService.decrypt(userConfigOpt.get().getEncryptedPassword());
+            } else {
+                System.err.println("Cannot send event invite: actualPassword is null and default config not found.");
+                return;
+            }
         }
 
-        MailConfigDetector.Config config = orgEmailConfigService.getMailConfig(fromEmail, password);
+        MailConfigDetector.Config config = orgEmailConfigService.getMailConfig(actualFromEmail, actualPassword);
 
         JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
         mailSender.setHost(config.getSmtpHost());
         if (config.getSmtpPort() != null) {
             mailSender.setPort(Integer.parseInt(config.getSmtpPort()));
         }
-        mailSender.setUsername(fromEmail);
-        mailSender.setPassword(password);
+        mailSender.setUsername(actualFromEmail);
+        mailSender.setPassword(actualPassword);
 
         Properties props = mailSender.getJavaMailProperties();
         props.put("mail.transport.protocol", "smtp");
@@ -106,7 +120,7 @@ public class MailService {
 
         MimeMessage message = mailSender.createMimeMessage();
         
-        message.setFrom(new javax.mail.internet.InternetAddress(fromEmail));
+        message.setFrom(new javax.mail.internet.InternetAddress(actualFromEmail));
         message.setRecipient(javax.mail.Message.RecipientType.TO, new javax.mail.internet.InternetAddress(to));
         message.setSubject(subject);
 
@@ -134,7 +148,10 @@ public class MailService {
         // Attachment part
         javax.mail.internet.MimeBodyPart attachmentPart = new javax.mail.internet.MimeBodyPart();
         attachmentPart.setFileName("invite.ics");
-        attachmentPart.setContent(icsContent, "text/calendar; method=REQUEST; name=\"invite.ics\"");
+        attachmentPart.setDisposition(javax.mail.Part.ATTACHMENT);
+        attachmentPart.setDataHandler(new javax.activation.DataHandler(
+                new javax.mail.util.ByteArrayDataSource(icsContent.getBytes("UTF-8"), "text/calendar; method=REQUEST; charset=UTF-8; name=\"invite.ics\"")
+        ));
         mixedMultipart.addBodyPart(attachmentPart);
 
         message.setContent(mixedMultipart);

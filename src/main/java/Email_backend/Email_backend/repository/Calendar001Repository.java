@@ -94,6 +94,11 @@ public class Calendar001Repository {
         return jdbcTemplate.query(sql, rowMapper, userid);
     }
 
+    public List<Calendar001> findByOrgcode(Integer orgcode) {
+        String sql = "SELECT * FROM calender_dev.calendar001 WHERE orgcode = ?";
+        return jdbcTemplate.query(sql, rowMapper, orgcode);
+    }
+
     public int update(Calendar001 calendar) {
         String sql = "UPDATE calender_dev.calendar001 SET orgcode = ?, userid = ?, calname = ?, timezone = ?, " +
                      "country = ?, euser = ?, edate = ?, auser = ?, adate = ? WHERE calid = ?";

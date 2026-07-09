@@ -65,6 +65,18 @@ public class UnifiedCalendarService {
         return calendar001Repository.findAll();
     }
 
+    public List<Calendar001> getCalendarsForUser(String email) {
+        if (email == null || email.trim().isEmpty()) {
+            return calendar001Repository.findAll();
+        }
+        Optional<UserEmailConfig> configOpt = userEmailConfigRepository.findByEmailAddress(email);
+        if (configOpt.isPresent()) {
+            Integer orgcode = configOpt.get().getOrgcode().intValue();
+            return calendar001Repository.findByOrgcode(orgcode);
+        }
+        return calendar001Repository.findAll();
+    }
+
     public Optional<Calendar001> getCalendarById(Integer id) {
         return calendar001Repository.findById(id);
     }

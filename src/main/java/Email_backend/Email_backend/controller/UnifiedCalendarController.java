@@ -40,9 +40,9 @@ public class UnifiedCalendarController {
     }
 
     @GetMapping("/api/calendars")
-    public ResponseEntity<List<Calendar001>> getAllCalendars() {
+    public ResponseEntity<List<Calendar001>> getAllCalendars(@RequestHeader(value = "X-Email", required = false) String email) {
         try {
-            List<Calendar001> calendars = unifiedCalendarService.getAllCalendars();
+            List<Calendar001> calendars = unifiedCalendarService.getCalendarsForUser(email);
             if (calendars.isEmpty()) {
                 return new ResponseEntity<>(HttpStatus.NO_CONTENT);
             }

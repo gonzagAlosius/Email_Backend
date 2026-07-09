@@ -143,7 +143,7 @@ public class EventService {
         String ics = icsService.generate(req, email);
 
         // 3. Send email to all attendees
-        if (req.getAttendees() != null && email != null && password != null) {
+        if (req.getAttendees() != null && email != null) {
             for(String attendeeEmail : req.getAttendees()) {
                 try {
                     mailService.sendEventInvite(email, password, attendeeEmail, req.getTitle(), req.getDescription() == null ? "Calendar Event Invite" : req.getDescription(), ics);
