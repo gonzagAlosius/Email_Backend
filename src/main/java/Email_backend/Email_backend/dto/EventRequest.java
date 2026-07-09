@@ -22,6 +22,8 @@ public class EventRequest {
     private String timeZone;
     private String showAs;
     private String recurrence;
+    private Integer calid;
+    private Integer orgcode;
 
     // Getters and Setters
     public String getTitle() { return title; }
@@ -68,4 +70,10 @@ public class EventRequest {
     
     public String getShowAs() { return showAs; }
     public void setShowAs(String showAs) { this.showAs = showAs; }
+    
+    public Integer getCalid() { return calid; }
+    public void setCalid(Integer calid) { this.calid = calid; }
+    
+    public Integer getOrgcode() { return orgcode; }
+    public void setOrgcode(Integer orgcode) { this.orgcode = orgcode; }
 }

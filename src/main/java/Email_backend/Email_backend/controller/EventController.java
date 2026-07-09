@@ -54,7 +54,9 @@ public class EventController {
     @GetMapping
     public ResponseEntity<?> getAllEvents(
             @RequestHeader(value = "X-Email", required = false) String email,
-            @RequestHeader(value = "X-Password", required = false) String password) {
+            @RequestHeader(value = "X-Password", required = false) String password,
+            @RequestParam(required = false) Integer calid,
+            @RequestParam(required = false) Integer orgcode) {
         
         if (email == null || email.trim().isEmpty()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Email header is missing");
@@ -68,7 +70,7 @@ public class EventController {
             }
         }
         
-        return ResponseEntity.ok(service.getAllEvents(email, actualPassword));
+        return ResponseEntity.ok(service.getAllEvents(email, actualPassword, calid, orgcode));
     }
 
     @PutMapping("/{id}")

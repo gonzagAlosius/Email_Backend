@@ -31,6 +31,9 @@ public class EventService {
     @Autowired
     private BluehostCalendarService bluehostCalendarService;
 
+    @Autowired
+    private UnifiedCalendarService unifiedCalendarService;
+
     public void createEvent(EventRequest req, String email, String password) {
         req.setTeamsMeeting(true);
 
@@ -53,6 +56,88 @@ public class EventService {
         event.setShowAs(req.getShowAs());
         event.setOrganizerEmail(email != null && !email.isEmpty() ? email : "admin@company.com");
         repo.save(event);
+
+        // 1b. Save in calender_dev.calendar002 and 003
+        if (email != null && !email.isEmpty()) {
+            try {
+                Integer calid = req.getCalid();
+                Integer orgcode = req.getOrgcode();
+                
+                if (calid == null || orgcode == null) {
+                    java.util.List<Email_backend.Email_backend.model.Calendar001> userCalendars = unifiedCalendarService.getCalendarsByUserId(email);
+                    if (userCalendars != null && !userCalendars.isEmpty()) {
+                        calid = userCalendars.get(0).getCalid();
+                        orgcode = userCalendars.get(0).getOrgcode();
+                    } else {
+                        Email_backend.Email_backend.model.Calendar001 newCal = new Email_backend.Email_backend.model.Calendar001();
+                        newCal.setUserid(email);
+                        newCal.setCalname("Default Calendar");
+                        newCal.setTimezone("UTC");
+                        newCal.setCountry("US");
+                        newCal.setOrgcode(1);
+                        Email_backend.Email_backend.model.Calendar001 savedCal = unifiedCalendarService.createCalendar(newCal);
+                        if (savedCal != null && savedCal.getCalid() != null) {
+                            calid = savedCal.getCalid();
+                            orgcode = savedCal.getOrgcode();
+                        } else {
+                            calid = 1;
+                            orgcode = 1;
+                        }
+                    }
+                }
+
+                Email_backend.Email_backend.model.Calendar002 cal2 = new Email_backend.Email_backend.model.Calendar002();
+                cal2.setCalid(calid);
+                cal2.setOrgcode(orgcode);
+                cal2.setTitle(req.getTitle());
+                cal2.setDescription(req.getDescription());
+                cal2.setLocation(req.getLocation());
+                cal2.setStartTime(req.getStartTime());
+                cal2.setEndTime(req.getEndTime());
+                cal2.setIsAllDay(req.isAllDay() ? 1 : 0);
+                cal2.setRecurrenceRule(req.getRecurrence());
+                cal2.setStatus("CONFIRMED");
+
+                java.util.List<Email_backend.Email_backend.model.Calendar003> attendees = new java.util.ArrayList<>();
+                if (req.getAttendees() != null) {
+                    for (String att : req.getAttendees()) {
+                        Email_backend.Email_backend.model.Calendar003 cal3 = new Email_backend.Email_backend.model.Calendar003();
+                        cal3.setEmail(att);
+                        cal3.setDisplayName(att);
+                        cal3.setIsOptional(false);
+                        cal3.setResponseStatus("NEEDS-ACTION");
+                        attendees.add(cal3);
+                    }
+                }
+                
+                if (req.getOptionalAttendees() != null) {
+                    for (String att : req.getOptionalAttendees()) {
+                        Email_backend.Email_backend.model.Calendar003 cal3 = new Email_backend.Email_backend.model.Calendar003();
+                        cal3.setEmail(att);
+                        cal3.setDisplayName(att);
+                        cal3.setIsOptional(true);
+                        cal3.setResponseStatus("NEEDS-ACTION");
+                        attendees.add(cal3);
+                    }
+                }
+
+                UnifiedCalendarService.EventCreationRequest uReq = new UnifiedCalendarService.EventCreationRequest();
+                uReq.setEvent(cal2);
+                uReq.setAttendees(attendees);
+
+                unifiedCalendarService.createEvent(email, uReq);
+                System.out.println("[DEBUG] Successfully inserted event into calendar002 and 003 for user: " + email);
+            } catch (Exception e) {
+                System.err.println("[ERROR] Failed to insert into calendar002/003: " + e.getMessage());
+                e.printStackTrace();
+                try {
+                    java.io.PrintWriter pw = new java.io.PrintWriter(new java.io.FileWriter(System.getProperty("user.home") + "/Desktop/calendar_error.txt", true));
+                    pw.println("Error inserting into calendar002/003: " + e.getMessage());
+                    e.printStackTrace(pw);
+                    pw.close();
+                } catch (Exception ex) {}
+            }
+        }
 
         // 2. Generate ICS
         String ics = icsService.generate(req, email);
@@ -159,8 +244,29 @@ public class EventService {
     }
 
     // GET ALL EVENTS
-    public List<Event> getAllEvents(String email, String password) {
+    public List<Event> getAllEvents(String email, String password, Integer calid, Integer orgcode) {
         List<Event> allEvents = new ArrayList<>();
+        
+        if (calid != null && orgcode != null) {
+            List<Email_backend.Email_backend.model.Calendar002> cal2Events = unifiedCalendarService.getEventsByCalendar(orgcode, calid);
+            if (cal2Events != null) {
+                for (Email_backend.Email_backend.model.Calendar002 c2 : cal2Events) {
+                    Event e = new Event();
+                    e.setId(c2.getEventid().longValue());
+                    e.setTitle(c2.getTitle());
+                    e.setDescription(c2.getDescription());
+                    e.setLocation(c2.getLocation());
+                    e.setStartTime(c2.getStartTime());
+                    e.setEndTime(c2.getEndTime());
+                    e.setAllDay(c2.getIsAllDay() != null && c2.getIsAllDay() == 1);
+                    e.setRecurrence(c2.getRecurrenceRule());
+                    e.setOrganizerEmail(email);
+                    allEvents.add(e);
+                }
+            }
+            return allEvents;
+        }
+
         Map<String, Event> graphIdToLocalEvent = new java.util.HashMap<>();
         
         List<Event> localEvents = repo.findAll();
