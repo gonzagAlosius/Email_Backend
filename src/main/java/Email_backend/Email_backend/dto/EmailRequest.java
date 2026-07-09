@@ -8,8 +8,12 @@ public class EmailRequest {
     private String subject;
     private String content;
     private List<AttachmentRequest> attachments;
+    private Long draftUid;
 
     public EmailRequest() {}
+
+    public Long getDraftUid() { return draftUid; }
+    public void setDraftUid(Long draftUid) { this.draftUid = draftUid; }
 
     public String getTo() { return to; }
     public void setTo(String to) { this.to = to; }

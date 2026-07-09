@@ -12,6 +12,7 @@ import javax.mail.Folder;
 import javax.mail.Message;
 import javax.mail.Session;
 import javax.mail.Store;
+import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 import java.util.Base64;
 import java.util.Properties;
@@ -110,24 +111,20 @@ public class EmailService {
 
     private void saveToSentFolder(MimeMessage message, String username, String password,
             MailConfigDetector.Config config) throws Exception {
-        boolean isSecure = config.getImapSecure();
-        String protocol = isSecure ? "imaps" : "imap";
-
         Properties props = new Properties();
-        props.put("mail.store.protocol", protocol);
-        props.put("mail." + protocol + ".host", config.getImapHost());
-        props.put("mail." + protocol + ".port", config.getImapPort());
-        if (isSecure) {
-            props.put("mail.imaps.ssl.trust", config.getImapHost());
-        }
+        props.put("mail.store.protocol", "imaps");
+        props.put("mail.imaps.host", config.getImapHost());
+        props.put("mail.imaps.port", config.getImapPort());
+        props.put("mail.imaps.ssl.trust", config.getImapHost());
 
         if (MailConfigDetector.isOAuthToken(password)) {
-            props.put("mail." + protocol + ".auth.mechanisms", "XOAUTH2");
-            props.put("mail." + protocol + ".sasl.enable", "true");
+            props.put("mail.imaps.auth.mechanisms", "XOAUTH2");
+            props.put("mail.imaps.auth.login.disable", "true");
+            props.put("mail.imaps.auth.plain.disable", "true");
         }
 
         Session session = Session.getInstance(props, null);
-        Store store = session.getStore(protocol);
+        Store store = session.getStore("imaps");
         store.connect(config.getImapHost(), username, password);
 
         Folder folder = store.getFolder(config.getSentFolder());
@@ -142,11 +139,10 @@ public class EmailService {
                 if (inboxSent.exists()) {
                     folder = inboxSent;
                 } else {
-                    Folder sentItems = store.getFolder("Sent Items");
-                    if (sentItems.exists()) {
-                        folder = sentItems;
-                    } else {
-                        // Create it if it doesn't exist
+                    if (config.getImapHost().contains("gmail.com")) {
+                        folder = store.getFolder("[Gmail]/Sent Mail");
+                    }
+                    if (!folder.exists()) {
                         folder.create(Folder.HOLDS_MESSAGES);
                     }
                 }
@@ -163,5 +159,142 @@ public class EmailService {
 
         folder.close(false);
         store.close();
+    }
+
+    public Long saveDraft(EmailRequest emailRequest, String username, String password) throws Exception {
+        String resolvedPassword = MailConfigDetector.resolvePassword(username, password);
+        MailConfigDetector.Config config = orgEmailConfigService.getMailConfig(username, resolvedPassword);
+
+        Properties props = new Properties();
+        props.put("mail.store.protocol", "imaps");
+        props.put("mail.imaps.host", config.getImapHost());
+        props.put("mail.imaps.port", config.getImapPort());
+        props.put("mail.imaps.ssl.trust", config.getImapHost());
+
+        if (MailConfigDetector.isOAuthToken(resolvedPassword)) {
+            props.put("mail.imaps.auth.mechanisms", "XOAUTH2");
+            props.put("mail.imaps.auth.login.disable", "true");
+            props.put("mail.imaps.auth.plain.disable", "true");
+        }
+
+        Session session = Session.getInstance(props, null);
+        Store store = session.getStore("imaps");
+        store.connect(config.getImapHost(), username, resolvedPassword);
+
+        String imapHost = config.getImapHost();
+        Folder folder = getDraftsFolderWithFallback(store, imapHost);
+
+        if (!folder.exists()) {
+            folder.create(Folder.HOLDS_MESSAGES);
+        }
+
+        folder.open(Folder.READ_WRITE);
+
+        // If we are updating an existing draft, delete the old one first
+        if (emailRequest.getDraftUid() != null) {
+            if (folder instanceof com.sun.mail.imap.IMAPFolder) {
+                com.sun.mail.imap.IMAPFolder imapFolder = (com.sun.mail.imap.IMAPFolder) folder;
+                Message oldMsg = imapFolder.getMessageByUID(emailRequest.getDraftUid());
+                if (oldMsg != null) {
+                    oldMsg.setFlag(javax.mail.Flags.Flag.DELETED, true);
+                }
+            }
+        }
+
+        MimeMessage message = new MimeMessage(session);
+        message.setFrom(new InternetAddress(username));
+        if (emailRequest.getTo() != null && !emailRequest.getTo().trim().isEmpty()) {
+            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(emailRequest.getTo()));
+        }
+        if (emailRequest.getCc() != null && !emailRequest.getCc().trim().isEmpty()) {
+            message.setRecipients(Message.RecipientType.CC, InternetAddress.parse(emailRequest.getCc()));
+        }
+        message.setSubject(emailRequest.getSubject() != null ? emailRequest.getSubject() : "");
+        message.setContent(emailRequest.getContent() != null ? emailRequest.getContent() : "", "text/html; charset=utf-8");
+        message.setFlag(javax.mail.Flags.Flag.DRAFT, true);
+        message.saveChanges();
+
+        Long newUid = null;
+        if (folder instanceof com.sun.mail.imap.IMAPFolder) {
+            try {
+                com.sun.mail.imap.AppendUID[] uids = ((com.sun.mail.imap.IMAPFolder) folder).appendUIDMessages(new Message[] { message });
+                if (uids != null && uids.length > 0) {
+                    newUid = uids[0].uid;
+                }
+            } catch (Exception e) {
+                System.err.println("Failed to append via appendUIDMessages: " + e.getMessage());
+                folder.appendMessages(new Message[] { message });
+            }
+        } else {
+            folder.appendMessages(new Message[] { message });
+        }
+
+        folder.close(true); // expunge=true to delete old draft marked as DELETED
+        store.close();
+
+        return newUid;
+    }
+
+    public void deleteDraft(Long uid, String username, String password) throws Exception {
+        String resolvedPassword = MailConfigDetector.resolvePassword(username, password);
+        MailConfigDetector.Config config = orgEmailConfigService.getMailConfig(username, resolvedPassword);
+
+        Properties props = new Properties();
+        props.put("mail.store.protocol", "imaps");
+        props.put("mail.imaps.host", config.getImapHost());
+        props.put("mail.imaps.port", config.getImapPort());
+        props.put("mail.imaps.ssl.trust", config.getImapHost());
+
+        if (MailConfigDetector.isOAuthToken(resolvedPassword)) {
+            props.put("mail.imaps.auth.mechanisms", "XOAUTH2");
+            props.put("mail.imaps.auth.login.disable", "true");
+            props.put("mail.imaps.auth.plain.disable", "true");
+        }
+
+        Session session = Session.getInstance(props, null);
+        Store store = session.getStore("imaps");
+        store.connect(config.getImapHost(), username, resolvedPassword);
+
+        String imapHost = config.getImapHost();
+        Folder folder = getDraftsFolderWithFallback(store, imapHost);
+
+        if (folder.exists()) {
+            folder.open(Folder.READ_WRITE);
+            if (folder instanceof com.sun.mail.imap.IMAPFolder) {
+                com.sun.mail.imap.IMAPFolder imapFolder = (com.sun.mail.imap.IMAPFolder) folder;
+                Message msg = imapFolder.getMessageByUID(uid);
+                if (msg != null) {
+                    msg.setFlag(javax.mail.Flags.Flag.DELETED, true);
+                }
+            }
+            folder.close(true);
+        }
+        store.close();
+    }
+
+    private Folder getDraftsFolderWithFallback(Store store, String imapHost) throws Exception {
+        String primaryName = "Drafts";
+        if (imapHost != null && (imapHost.contains("gmail.com") || imapHost.contains("googlemail.com"))) {
+            primaryName = "[Gmail]/Drafts";
+        }
+        Folder folder = store.getFolder(primaryName);
+        if (folder.exists()) {
+            return folder;
+        }
+
+        String[] fallbacks = { "Drafts", "Draft", "INBOX.Drafts", "INBOX.Draft", "Drafts Items", "Draft Items" };
+        for (String fb : fallbacks) {
+            Folder f = store.getFolder(fb);
+            if (f.exists()) {
+                return f;
+            }
+            if (imapHost != null && (imapHost.contains("gmail.com") || imapHost.contains("googlemail.com"))) {
+                f = store.getFolder("[Gmail]/" + fb);
+                if (f.exists()) {
+                    return f;
+                }
+            }
+        }
+        return folder;
     }
 }

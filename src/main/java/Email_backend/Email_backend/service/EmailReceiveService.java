@@ -28,6 +28,13 @@ public class EmailReceiveService {
         return fetchEmailsFromFolder("INBOX", username, resolvedPassword, config, page, size);
     }
 
+    public List<EmailResponse> fetchDraftMessages(String username, String password, int page, int size)
+            throws Exception {
+        String resolvedPassword = MailConfigDetector.resolvePassword(username, password);
+        MailConfigDetector.Config config = orgEmailConfigService.getMailConfig(username, resolvedPassword);
+        return fetchEmailsFromFolder("Drafts", username, resolvedPassword, config, page, size);
+    }
+
     public List<EmailResponse> fetchSentMessages(String username, String password, int page, int size)
             throws Exception {
         String resolvedPassword = MailConfigDetector.resolvePassword(username, password);
@@ -60,16 +67,7 @@ public class EmailReceiveService {
 
         store.connect(config.getImapHost(), username, password);
 
-        Folder folder = store.getFolder(folderName);
-        if (!folder.exists()) {
-            // Fallback for different folder naming conventions
-            if (folderName.equalsIgnoreCase("Sent")) {
-                folder = store.getFolder("Sent Messages");
-                if (!folder.exists()) {
-                    folder = store.getFolder("INBOX.Sent");
-                }
-            }
-        }
+        Folder folder = getFolderWithFallback(store, folderName, config.getImapHost());
 
         folder.open(Folder.READ_ONLY);
 
@@ -201,15 +199,7 @@ public class EmailReceiveService {
         Store store = session.getStore("imaps");
         store.connect(config.getImapHost(), username, resolvedPassword);
 
-        Folder folder = store.getFolder(folderName);
-        if (!folder.exists()) {
-            if (folderName.equalsIgnoreCase("Sent")) {
-                folder = store.getFolder("Sent Messages");
-                if (!folder.exists()) {
-                    folder = store.getFolder("INBOX.Sent");
-                }
-            }
-        }
+        Folder folder = getFolderWithFallback(store, folderName, config.getImapHost());
         try {
             folder.open(Folder.READ_WRITE);
             System.out.println("DEBUG: IMAP folder " + folderName + " opened in READ_WRITE mode");
@@ -379,15 +369,7 @@ public class EmailReceiveService {
         Store store = session.getStore("imaps");
         store.connect(config.getImapHost(), username, resolvedPassword);
 
-        Folder folder = store.getFolder(folderName);
-        if (!folder.exists()) {
-            if (folderName.equalsIgnoreCase("Sent")) {
-                folder = store.getFolder("Sent Messages");
-                if (!folder.exists()) {
-                    folder = store.getFolder("INBOX.Sent");
-                }
-            }
-        }
+        Folder folder = getFolderWithFallback(store, folderName, config.getImapHost());
         folder.open(Folder.READ_ONLY);
 
         byte[] bytes = null;
@@ -532,5 +514,33 @@ public class EmailReceiveService {
         fallback.setSubject("Mock Email Content");
         fallback.setContent("<div><p>This is fallback mock content for mail ID " + uid + ".</p></div>");
         return fallback;
+    }
+
+    public static Folder getFolderWithFallback(Store store, String folderName, String imapHost) throws Exception {
+        Folder folder = store.getFolder(folderName);
+        if (folder.exists()) {
+            return folder;
+        }
+
+        // Try standard fallback names
+        String cleanName = folderName.toLowerCase();
+        String[] fallbacks = new String[0];
+        if (cleanName.contains("draft")) {
+            fallbacks = new String[] { "Drafts", "Draft", "INBOX.Drafts", "INBOX.Draft", "Drafts Items", "Draft Items" };
+        } else if (cleanName.contains("sent")) {
+            fallbacks = new String[] { "Sent", "Sent Messages", "Sent Items", "INBOX.Sent", "INBOX.Sent Items" };
+        }
+
+        for (String fb : fallbacks) {
+            Folder f = store.getFolder(fb);
+            if (f.exists()) {
+                return f;
+            }
+            if (imapHost != null && (imapHost.contains("gmail.com") || imapHost.contains("googlemail.com"))) {
+                f = store.getFolder("[Gmail]/" + fb);
+                if (f.exists()) return f;
+            }
+        }
+        return folder;
     }
 }

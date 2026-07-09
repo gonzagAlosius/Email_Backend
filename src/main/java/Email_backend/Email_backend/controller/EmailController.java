@@ -243,6 +243,15 @@ public class EmailController {
         try {
             emailService.sendEmail(emailRequest, email, actualPassword);
 
+            // Clean up draft if sent from composer
+            if (emailRequest.getDraftUid() != null) {
+                try {
+                    emailService.deleteDraft(emailRequest.getDraftUid(), email, actualPassword);
+                } catch (Exception draftEx) {
+                    System.err.println("Failed to delete draft after sending: " + draftEx.getMessage());
+                }
+            }
+
             // Send a push notification to the recipient(s) if they are registered users
             try {
                 String recipientEmail = emailRequest.getTo();
@@ -280,6 +289,94 @@ public class EmailController {
                         .body("Authentication failed: " + e.getMessage());
             }
             return ResponseEntity.internalServerError().body("Failed to send email: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/drafts")
+    public ResponseEntity<?> getDrafts(
+            @RequestHeader("X-Email") String email,
+            @RequestHeader(value = "X-Password", required = false) String password,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "50") int size) {
+        String actualPassword = password;
+        if (actualPassword == null || actualPassword.trim().isEmpty()) {
+            Optional<UserEmailConfig> configOpt = userEmailConfigRepository.findByEmailAddress(email);
+            if (configOpt.isPresent()) {
+                actualPassword = encryptionService.decrypt(configOpt.get().getEncryptedPassword());
+            } else {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("Password missing from request and database. Please sign in.");
+            }
+        }
+        try {
+            List<EmailResponse> drafts = emailReceiveService.fetchDraftMessages(email, actualPassword, page, size);
+            return ResponseEntity.ok(drafts);
+        } catch (Exception e) {
+            e.printStackTrace();
+            if (isAuthFailure(e)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("Authentication failed: " + e.getMessage());
+            }
+            return ResponseEntity.internalServerError().body("Failed to load drafts: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/drafts")
+    public ResponseEntity<?> saveDraft(
+            @RequestHeader("X-Email") String email,
+            @RequestHeader(value = "X-Password", required = false) String password,
+            @RequestBody EmailRequest emailRequest) {
+        String actualPassword = password;
+        if (actualPassword == null || actualPassword.trim().isEmpty()) {
+            Optional<UserEmailConfig> configOpt = userEmailConfigRepository.findByEmailAddress(email);
+            if (configOpt.isPresent()) {
+                actualPassword = encryptionService.decrypt(configOpt.get().getEncryptedPassword());
+            } else {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("Password missing from request and database. Please sign in.");
+            }
+        }
+        try {
+            Long draftUid = emailService.saveDraft(emailRequest, email, actualPassword);
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("draftUid", draftUid);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            if (isAuthFailure(e)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("Authentication failed: " + e.getMessage());
+            }
+            return ResponseEntity.internalServerError().body("Failed to save draft: " + e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/drafts/{uid}")
+    public ResponseEntity<?> deleteDraft(
+            @RequestHeader("X-Email") String email,
+            @RequestHeader(value = "X-Password", required = false) String password,
+            @PathVariable("uid") Long uid) {
+        String actualPassword = password;
+        if (actualPassword == null || actualPassword.trim().isEmpty()) {
+            Optional<UserEmailConfig> configOpt = userEmailConfigRepository.findByEmailAddress(email);
+            if (configOpt.isPresent()) {
+                actualPassword = encryptionService.decrypt(configOpt.get().getEncryptedPassword());
+            } else {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("Password missing from request and database. Please sign in.");
+            }
+        }
+        try {
+            emailService.deleteDraft(uid, email, actualPassword);
+            return ResponseEntity.ok("Draft deleted successfully");
+        } catch (Exception e) {
+            e.printStackTrace();
+            if (isAuthFailure(e)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("Authentication failed: " + e.getMessage());
+            }
+            return ResponseEntity.internalServerError().body("Failed to delete draft: " + e.getMessage());
         }
     }
 
