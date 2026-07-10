@@ -1,0 +1,54 @@
+name: Build and Deploy WAR to Apache Tomcat
+
+on:
+  push:
+    branches:
+      - UAT
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Build WAR package
+        run: |
+          mvn clean package -DskipTests
+
+      - name: Verify WAR file location
+        run: |
+          echo "Listing WAR files:"
+          find . -name "*.war" || echo "No WAR files found!"
+
+      - name: Upload WAR file via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.TOMCAT_HOST }}
+          username: ${{ secrets.TOMCAT_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "target/*.war"
+          target: "/tmp/"
+
+      - name: Move WAR to Tomcat webapps & restart
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.TOMCAT_HOST }}
+          username: ${{ secrets.TOMCAT_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "Moving WAR to Tomcat webapps..."
+            sudo mv /tmp/target/*.war /opt/tomcat9/webapps/
+            echo "Restarting Tomcat..."
+            sudo systemctl restart tomcat
+            sleep 5
+            sudo systemctl status tomcat --no-pager
+            echo "✅ Deployment complete!"
