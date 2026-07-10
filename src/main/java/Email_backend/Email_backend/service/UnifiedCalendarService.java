@@ -152,4 +152,15 @@ public class UnifiedCalendarService {
     public List<Calendar002> getEventsByCalendar(Integer orgcode, Integer calid) {
         return calendar002Repository.findByCalid(orgcode, calid);
     }
+
+    public void updateEvent(Integer calid, Integer orgcode, Integer eventid, Calendar002 updatedEvent) {
+        updatedEvent.setCalid(calid);
+        updatedEvent.setOrgcode(orgcode);
+        updatedEvent.setEventid(eventid);
+        calendar002Repository.update(updatedEvent);
+    }
+
+    public void deleteEvent(Integer orgcode, Integer calid, Integer eventid) {
+        calendar002Repository.delete(orgcode, calid, eventid);
+    }
 }

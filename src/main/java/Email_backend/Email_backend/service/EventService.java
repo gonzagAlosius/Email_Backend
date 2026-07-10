@@ -55,6 +55,7 @@ public class EventService {
         event.setTimeZone(req.getTimeZone());
         event.setShowAs(req.getShowAs());
         event.setOrganizerEmail(email != null && !email.isEmpty() ? email : "admin@company.com");
+        event.setMeeturl(req.getMeeturl());
         repo.save(event);
 
         // 1b. Save in calender_dev.calendar002 and 003
@@ -97,6 +98,7 @@ public class EventService {
                 cal2.setIsAllDay(req.isAllDay() ? 1 : 0);
                 cal2.setRecurrenceRule(req.getRecurrence());
                 cal2.setStatus("CONFIRMED");
+                cal2.setMeeturl(req.getMeeturl());
 
                 java.util.List<Email_backend.Email_backend.model.Calendar003> attendees = new java.util.ArrayList<>();
                 if (req.getAttendees() != null) {
@@ -201,6 +203,7 @@ public class EventService {
         event.setImportance(req.getImportance());
         event.setTimeZone(req.getTimeZone());
         event.setShowAs(req.getShowAs());
+        event.setMeeturl(req.getMeeturl());
         repo.save(event);
 
         if (email != null && password != null && event.getGraphEventId() != null) {
@@ -261,6 +264,9 @@ public class EventService {
                     e.setAllDay(c2.getIsAllDay() != null && c2.getIsAllDay() == 1);
                     e.setRecurrence(c2.getRecurrenceRule());
                     e.setOrganizerEmail(email);
+                    e.setCalid(c2.getCalid());
+                    e.setOrgcode(c2.getOrgcode());
+                    e.setMeeturl(c2.getMeeturl());
                     allEvents.add(e);
                 }
             }

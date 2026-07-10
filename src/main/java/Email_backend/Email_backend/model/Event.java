@@ -98,4 +98,22 @@ public class Event {
     
     public String getGraphEventId() { return graphEventId; }
     public void setGraphEventId(String graphEventId) { this.graphEventId = graphEventId; }
+
+    @Transient
+    private Integer calid;
+
+    @Transient
+    private Integer orgcode;
+
+    public Integer getCalid() { return calid; }
+    public void setCalid(Integer calid) { this.calid = calid; }
+
+    public Integer getOrgcode() { return orgcode; }
+    public void setOrgcode(Integer orgcode) { this.orgcode = orgcode; }
+
+    @Column(length = 1000)
+    private String meeturl;
+
+    public String getMeeturl() { return meeturl; }
+    public void setMeeturl(String meeturl) { this.meeturl = meeturl; }
 }
