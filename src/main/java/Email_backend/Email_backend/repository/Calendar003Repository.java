@@ -33,4 +33,15 @@ public class Calendar003Repository {
             ps.setObject(8, attendee.getIsOptional());
         });
     }
+
+    public void updateResponseStatus(Integer orgcode, Integer calid, Integer eventId, String email, String responseStatus) {
+        String sql = "UPDATE calender_dev.calendar003 SET response_status = ?, restimestamp = NOW() " +
+                     "WHERE orgcode = ? AND calid = ? AND event_id = ? AND email = ?";
+        jdbcTemplate.update(sql, responseStatus, orgcode, calid, eventId, email);
+    }
+
+    public void deleteByEventId(Integer orgcode, Integer calid, Integer eventId) {
+        String sql = "DELETE FROM calender_dev.calendar003 WHERE orgcode = ? AND calid = ? AND event_id = ?";
+        jdbcTemplate.update(sql, orgcode, calid, eventId);
+    }
 }

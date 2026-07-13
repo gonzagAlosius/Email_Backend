@@ -16,4 +16,9 @@ public interface UserEmailConfigRepository extends JpaRepository<UserEmailConfig
      * Used by InboxPollingService to know which users need new-email checks.
      */
     List<UserEmailConfig> findByIsActiveTrueAndOneSignalSubscriptionIdIsNotNull();
+    
+    /**
+     * Finds all active users, regardless of push notification status.
+     */
+    List<UserEmailConfig> findByIsActiveTrue();
 }

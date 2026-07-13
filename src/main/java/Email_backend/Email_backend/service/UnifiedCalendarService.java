@@ -160,7 +160,13 @@ public class UnifiedCalendarService {
         calendar002Repository.update(updatedEvent);
     }
 
+    @Transactional
     public void deleteEvent(Integer orgcode, Integer calid, Integer eventid) {
+        calendar003Repository.deleteByEventId(orgcode, calid, eventid);
         calendar002Repository.delete(orgcode, calid, eventid);
+    }
+
+    public void updateAttendeeResponseStatus(Integer orgcode, Integer calid, Integer eventId, String email, String responseStatus) {
+        calendar003Repository.updateResponseStatus(orgcode, calid, eventId, email, responseStatus);
     }
 }

@@ -12,7 +12,7 @@ import java.util.UUID;
 @Service
 public class IcsService {
 
-    public String generate(EventRequest req, String organizerEmail) {
+    public String generate(EventRequest req, String organizerEmail, Integer orgcode, Integer calid, Integer eventid) {
 
         DateTimeFormatter f =
             DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'");
@@ -67,13 +67,18 @@ public class IcsService {
         if (organizerEmail != null && !organizerEmail.trim().isEmpty()) {
             organizerLine = "ORGANIZER;CN=" + organizerEmail + ":mailto:" + organizerEmail + "\r\n";
         }
+        
+        String uid = "event-" + orgcode + "-" + calid + "-" + eventid + "@botsuat.com";
+        if (orgcode == null || calid == null || eventid == null) {
+            uid = UUID.randomUUID().toString(); // Fallback if IDs are missing
+        }
 
         return "BEGIN:VCALENDAR\r\n" +
                 "VERSION:2.0\r\n" +
                 "PRODID:-//Calendar App//EN\r\n" +
                 "METHOD:REQUEST\r\n" +
                 "BEGIN:VEVENT\r\n" +
-                "UID:" + UUID.randomUUID() + "\r\n" +
+                "UID:" + uid + "\r\n" +
                 "DTSTAMP:" + now + "\r\n" +
                 "DTSTART:" + start + "\r\n" +
                 "DTEND:" + end + "\r\n" +
