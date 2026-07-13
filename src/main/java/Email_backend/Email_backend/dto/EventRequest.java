@@ -24,6 +24,7 @@ public class EventRequest {
     private String recurrence;
     private Integer calid;
     private Integer orgcode;
+    private String meeturl;
 
     // Getters and Setters
     public String getTitle() { return title; }
@@ -76,4 +77,7 @@ public class EventRequest {
     
     public Integer getOrgcode() { return orgcode; }
     public void setOrgcode(Integer orgcode) { this.orgcode = orgcode; }
+    
+    public String getMeeturl() { return meeturl; }
+    public void setMeeturl(String meeturl) { this.meeturl = meeturl; }
 }

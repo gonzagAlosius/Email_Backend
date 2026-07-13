@@ -3,38 +3,27 @@ package Email_backend.Email_backend.model;
 import javax.persistence.*;
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "events")
 public class Event {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private String title;
     
-    @Column(length = 2000)
     private String description;
     
     private String location;
     
-    @Column(name = "start_time")
     private LocalDateTime startTime;
     
-    @Column(name = "end_time")
     private LocalDateTime endTime;
     
     private String recurrence;
     
-    @Column(name = "organizer_email")
     private String organizerEmail;
     
-    @Column(name = "is_all_day")
     private boolean isAllDay;
     
-    @Column(name = "is_teams_meeting")
     private boolean isTeamsMeeting;
     
-    @Column(length = 5000)
     private String agenda;
     
     private String categories;
@@ -42,13 +31,10 @@ public class Event {
     private String sensitivity;
     private String importance;
     
-    @Column(name = "time_zone")
     private String timeZone;
     
-    @Column(name = "show_as")
     private String showAs;
     
-    @Column(name = "graph_event_id")
     private String graphEventId;
 
     // Getters and Setters
@@ -98,4 +84,19 @@ public class Event {
     
     public String getGraphEventId() { return graphEventId; }
     public void setGraphEventId(String graphEventId) { this.graphEventId = graphEventId; }
+
+    private Integer calid;
+
+    private Integer orgcode;
+
+    public Integer getCalid() { return calid; }
+    public void setCalid(Integer calid) { this.calid = calid; }
+
+    public Integer getOrgcode() { return orgcode; }
+    public void setOrgcode(Integer orgcode) { this.orgcode = orgcode; }
+
+    private String meeturl;
+
+    public String getMeeturl() { return meeturl; }
+    public void setMeeturl(String meeturl) { this.meeturl = meeturl; }
 }

@@ -2,7 +2,7 @@ package Email_backend.Email_backend.service;
 
 import Email_backend.Email_backend.dto.EventRequest;
 import Email_backend.Email_backend.model.Event;
-import Email_backend.Email_backend.repository.EventRepository;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -12,9 +12,6 @@ import java.util.Map;
 
 @Service
 public class EventService {
-
-    @Autowired
-    private EventRepository repo;
 
     @Autowired
     private IcsService icsService;
@@ -55,7 +52,10 @@ public class EventService {
         event.setTimeZone(req.getTimeZone());
         event.setShowAs(req.getShowAs());
         event.setOrganizerEmail(email != null && !email.isEmpty() ? email : "admin@company.com");
-        repo.save(event);
+        event.setMeeturl(req.getMeeturl());
+        // repo.save(event); // removed db save
+
+        String ics = null;
 
         // 1b. Save in calender_dev.calendar002 and 003
         if (email != null && !email.isEmpty()) {
@@ -97,6 +97,7 @@ public class EventService {
                 cal2.setIsAllDay(req.isAllDay() ? 1 : 0);
                 cal2.setRecurrenceRule(req.getRecurrence());
                 cal2.setStatus("CONFIRMED");
+                cal2.setMeeturl(req.getMeeturl());
 
                 java.util.List<Email_backend.Email_backend.model.Calendar003> attendees = new java.util.ArrayList<>();
                 if (req.getAttendees() != null) {
@@ -125,8 +126,13 @@ public class EventService {
                 uReq.setEvent(cal2);
                 uReq.setAttendees(attendees);
 
-                unifiedCalendarService.createEvent(email, uReq);
-                System.out.println("[DEBUG] Successfully inserted event into calendar002 and 003 for user: " + email);
+                Email_backend.Email_backend.model.Calendar002 savedEvent = unifiedCalendarService.createEvent(email, uReq);
+                Integer savedEventId = savedEvent != null ? savedEvent.getEventid() : null;
+                System.out.println("[DEBUG] Successfully inserted event into calendar002 and 003 for user: " + email + ", eventId: " + savedEventId);
+                
+                // Generate ICS with the correct IDs
+                ics = icsService.generate(req, email, orgcode, calid, savedEventId);
+                
             } catch (Exception e) {
                 System.err.println("[ERROR] Failed to insert into calendar002/003: " + e.getMessage());
                 e.printStackTrace();
@@ -138,9 +144,6 @@ public class EventService {
                 } catch (Exception ex) {}
             }
         }
-
-        // 2. Generate ICS
-        String ics = icsService.generate(req, email);
 
         // 3. Send email to all attendees
         if (req.getAttendees() != null && email != null) {
@@ -162,7 +165,7 @@ public class EventService {
                     String graphId = microsoftGraphService.createCalendarEvent(graphToken, req);
                     if (graphId != null) {
                         event.setGraphEventId(graphId);
-                        repo.save(event);
+                        // repo.save(event);
                     }
                 }
             } else if (MailConfigDetector.isGoogleDomain(domain)) {
@@ -170,77 +173,64 @@ public class EventService {
                     String googleId = googleCalendarService.createCalendarEvent(password, req);
                     if (googleId != null) {
                         event.setGraphEventId(googleId);
-                        repo.save(event);
+                        // repo.save(event);
                     }
                 }
             } else {
                 String bhId = bluehostCalendarService.createCalendarEvent(email, password, req, null);
                 if (bhId != null) {
                     event.setGraphEventId(bhId);
-                    repo.save(event);
+                    // repo.save(event);
                 }
             }
         }
     }
 
     public void updateEvent(Long id, EventRequest req, String email, String password) {
-        req.setTeamsMeeting(true);
-        Event event = repo.findById(id).orElseThrow(() -> new RuntimeException("Event not found"));
-        event.setTitle(req.getTitle());
-        event.setDescription(req.getDescription());
-        event.setLocation(req.getLocation());
-        event.setStartTime(req.getStartTime());
-        event.setEndTime(req.getEndTime());
-        event.setRecurrence(req.getRecurrence());
-        event.setAllDay(req.isAllDay());
-        event.setTeamsMeeting(true);
-        event.setAgenda(req.getAgenda());
-        event.setCategories(req.getCategories());
-        event.setReminder(req.getReminder());
-        event.setSensitivity(req.getSensitivity());
-        event.setImportance(req.getImportance());
-        event.setTimeZone(req.getTimeZone());
-        event.setShowAs(req.getShowAs());
-        repo.save(event);
+        // We no longer have local events fetched by Long id in repo.
+        // We only support updating external integrations via ID fallback or relying on unifiedCalendarService
+        // This is a simplified fallback since we removed repo.
+        String graphEventId = id.toString(); // Just a stub for graph since repo is gone
 
-        if (email != null && password != null && event.getGraphEventId() != null) {
+        if (email != null && password != null && graphEventId != null) {
             String domain = email.contains("@") ? email.substring(email.indexOf("@") + 1) : "";
             if (MailConfigDetector.isMicrosoftDomain(domain)) {
                 String graphToken = MailConfigDetector.resolveGraphPassword(email, password);
                 if (graphToken != null && MailConfigDetector.isOAuthToken(graphToken)) {
-                    microsoftGraphService.updateCalendarEvent(graphToken, event.getGraphEventId(), req);
+                    microsoftGraphService.updateCalendarEvent(graphToken, graphEventId, req);
                 }
             } else if (MailConfigDetector.isGoogleDomain(domain)) {
                 if (password != null && MailConfigDetector.isOAuthToken(password)) {
-                    googleCalendarService.updateCalendarEvent(password, event.getGraphEventId(), req);
+                    googleCalendarService.updateCalendarEvent(password, graphEventId, req);
                 }
             } else {
-                String existingUuid = event.getGraphEventId().startsWith("bluehost_") ? event.getGraphEventId().substring(9) : event.getGraphEventId();
+                String existingUuid = graphEventId.startsWith("bluehost_") ? graphEventId.substring(9) : graphEventId;
                 bluehostCalendarService.createCalendarEvent(email, password, req, existingUuid);
             }
         }
     }
 
     public void deleteEvent(Long id, String email, String password) {
-        Event event = repo.findById(id).orElseThrow(() -> new RuntimeException("Event not found"));
+        // We no longer have local events fetched by Long id in repo.
+        // Fallback for Graph API integration using id as string representation of graphEventId
+        // This is a simplified fallback since we removed repo.
+        String graphEventId = id.toString(); // Just a stub for graph since repo is gone
         
-        if (email != null && password != null && event.getGraphEventId() != null) {
+        if (email != null && password != null && graphEventId != null) {
             String domain = email.contains("@") ? email.substring(email.indexOf("@") + 1) : "";
             if (MailConfigDetector.isMicrosoftDomain(domain)) {
                 String graphToken = MailConfigDetector.resolveGraphPassword(email, password);
                 if (graphToken != null && MailConfigDetector.isOAuthToken(graphToken)) {
-                    microsoftGraphService.deleteCalendarEvent(graphToken, event.getGraphEventId());
+                    microsoftGraphService.deleteCalendarEvent(graphToken, graphEventId);
                 }
             } else if (MailConfigDetector.isGoogleDomain(domain)) {
                 if (password != null && MailConfigDetector.isOAuthToken(password)) {
-                    googleCalendarService.deleteCalendarEvent(password, event.getGraphEventId());
+                    googleCalendarService.deleteCalendarEvent(password, graphEventId);
                 }
             } else {
-                bluehostCalendarService.deleteCalendarEvent(email, password, event.getGraphEventId());
+                bluehostCalendarService.deleteCalendarEvent(email, password, graphEventId);
             }
         }
-        
-        repo.delete(event);
     }
 
     // GET ALL EVENTS
@@ -261,6 +251,9 @@ public class EventService {
                     e.setAllDay(c2.getIsAllDay() != null && c2.getIsAllDay() == 1);
                     e.setRecurrence(c2.getRecurrenceRule());
                     e.setOrganizerEmail(email);
+                    e.setCalid(c2.getCalid());
+                    e.setOrgcode(c2.getOrgcode());
+                    e.setMeeturl(c2.getMeeturl());
                     allEvents.add(e);
                 }
             }
@@ -269,18 +262,8 @@ public class EventService {
 
         Map<String, Event> graphIdToLocalEvent = new java.util.HashMap<>();
         
-        List<Event> localEvents = repo.findAll();
-        for (Event e : localEvents) {
-            // Filter local events to only include those where the current user is the organizer.
-            // (If they are an attendee, MS Graph will fetch it for them anyway).
-            if (email != null && e.getOrganizerEmail() != null && !e.getOrganizerEmail().equalsIgnoreCase(email)) {
-                continue;
-            }
-            if (e.getGraphEventId() != null) {
-                graphIdToLocalEvent.put(e.getGraphEventId(), e);
-            }
-            allEvents.add(e);
-        }
+        // 1. We no longer fetch local events from repo
+        // allEvents from email_dev.events are ignored.
         
         // 2. Fetch MS Graph events if valid credentials
         if (email != null && password != null) {

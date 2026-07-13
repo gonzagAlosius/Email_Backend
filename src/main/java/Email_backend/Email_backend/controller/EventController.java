@@ -23,6 +23,9 @@ public class EventController {
     private EventService service;
 
     @Autowired
+    private Email_backend.Email_backend.service.UnifiedCalendarService unifiedCalendarService;
+
+    @Autowired
     private UserEmailConfigRepository userEmailConfigRepository;
 
     @Autowired
@@ -93,7 +96,24 @@ public class EventController {
         }
 
         try {
-            service.updateEvent(id, req, email, actualPassword);
+            if (req.getCalid() != null && req.getOrgcode() != null) {
+                Email_backend.Email_backend.model.Calendar002 cal2 = new Email_backend.Email_backend.model.Calendar002();
+                cal2.setCalid(req.getCalid());
+                cal2.setOrgcode(req.getOrgcode());
+                cal2.setEventid(id.intValue());
+                cal2.setTitle(req.getTitle());
+                cal2.setDescription(req.getDescription());
+                cal2.setLocation(req.getLocation());
+                cal2.setStartTime(req.getStartTime());
+                cal2.setEndTime(req.getEndTime());
+                cal2.setIsAllDay(req.isAllDay() ? 1 : 0);
+                cal2.setRecurrenceRule(req.getRecurrence());
+                cal2.setStatus("CONFIRMED");
+                cal2.setMeeturl(req.getMeeturl());
+                unifiedCalendarService.updateEvent(req.getCalid(), req.getOrgcode(), id.intValue(), cal2);
+            } else {
+                service.updateEvent(id, req, email, actualPassword);
+            }
             return ResponseEntity.ok("Event updated successfully");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error updating event: " + e.getMessage());
@@ -104,7 +124,9 @@ public class EventController {
     public ResponseEntity<?> delete(
             @PathVariable Long id,
             @RequestHeader(value = "X-Email", required = false) String email,
-            @RequestHeader(value = "X-Password", required = false) String password) {
+            @RequestHeader(value = "X-Password", required = false) String password,
+            @RequestParam(required = false) Integer calid,
+            @RequestParam(required = false) Integer orgcode) {
         
         if (email == null || email.trim().isEmpty()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Email header is missing");
@@ -119,7 +141,11 @@ public class EventController {
         }
 
         try {
-            service.deleteEvent(id, email, actualPassword);
+            if (calid != null && orgcode != null) {
+                unifiedCalendarService.deleteEvent(orgcode, calid, id.intValue());
+            } else {
+                service.deleteEvent(id, email, actualPassword);
+            }
             return ResponseEntity.ok("Event deleted successfully");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error deleting event: " + e.getMessage());

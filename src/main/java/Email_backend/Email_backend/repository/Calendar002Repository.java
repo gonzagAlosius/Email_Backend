@@ -75,4 +75,33 @@ public class Calendar002Repository {
         String sql = "SELECT * FROM calender_dev.calendar002 WHERE orgcode = ? AND calid = ?";
         return jdbcTemplate.query(sql, rowMapper, orgcode, calid);
     }
+
+    public void update(Calendar002 event) {
+        String sql = "UPDATE calender_dev.calendar002 SET title = ?, description = ?, location = ?, " +
+                     "start_time = ?, end_time = ?, is_all_day = ?, is_recurring = ?, recurrence_rule = ?, " +
+                     "meeturl = ?, enddate = ?, status = ?, updated_at = NOW() " +
+                     "WHERE orgcode = ? AND calid = ? AND eventid = ?";
+
+        jdbcTemplate.update(sql,
+                event.getTitle(),
+                event.getDescription(),
+                event.getLocation(),
+                event.getStartTime() != null ? Timestamp.valueOf(event.getStartTime()) : null,
+                event.getEndTime() != null ? Timestamp.valueOf(event.getEndTime()) : null,
+                event.getIsAllDay(),
+                event.getIsRecurring(),
+                event.getRecurrenceRule(),
+                event.getMeeturl(),
+                event.getEnddate() != null ? java.sql.Date.valueOf(event.getEnddate()) : null,
+                event.getStatus(),
+                event.getOrgcode(),
+                event.getCalid(),
+                event.getEventid()
+        );
+    }
+
+    public void delete(Integer orgcode, Integer calid, Integer eventid) {
+        String sql = "DELETE FROM calender_dev.calendar002 WHERE orgcode = ? AND calid = ? AND eventid = ?";
+        jdbcTemplate.update(sql, orgcode, calid, eventid);
+    }
 }
