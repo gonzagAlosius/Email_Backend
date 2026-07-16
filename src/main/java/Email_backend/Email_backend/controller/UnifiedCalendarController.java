@@ -130,4 +130,78 @@ public class UnifiedCalendarController {
             return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
+
+    @PutMapping("/api/calendar-events/{orgcode}/{calid}/{eventid}/rsvp")
+    public ResponseEntity<?> updateRsvp(
+            @PathVariable Integer orgcode,
+            @PathVariable Integer calid,
+            @PathVariable Integer eventid,
+            @RequestBody java.util.Map<String, String> payload,
+            @RequestHeader(value = "X-Email") String emailHeader) {
+        try {
+            if (emailHeader == null || emailHeader.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("X-Email header is required");
+            }
+            String status = payload.get("status");
+            if (status == null || status.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Status is required");
+            }
+            unifiedCalendarService.updateAttendeeResponseStatus(orgcode, calid, eventid, emailHeader, status);
+            return new ResponseEntity<>(HttpStatus.OK);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @PutMapping("/api/calendar-events/rsvp-from-email")
+    public ResponseEntity<?> updateRsvpFromEmail(
+            @RequestBody java.util.Map<String, String> payload,
+            @RequestHeader(value = "X-Email") String emailHeader) {
+        try {
+            if (emailHeader == null || emailHeader.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("X-Email header is required");
+            }
+            String title = payload.get("title");
+            String startTimeStr = payload.get("startTime"); 
+            String status = payload.get("status");
+            
+            if (title == null || startTimeStr == null || status == null) {
+                 return ResponseEntity.badRequest().body("Missing required fields");
+            }
+            
+            String startTimePrefix = startTimeStr;
+            if (startTimePrefix.length() > 16) {
+                startTimePrefix = startTimePrefix.substring(0, 16);
+            }
+            
+            List<Calendar001> cals = unifiedCalendarService.getCalendarsForUser(emailHeader);
+            if (cals.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No calendar found");
+            
+            Integer orgcode = cals.get(0).getOrgcode();
+            Integer calid = cals.get(0).getCalid();
+            
+            List<Calendar002> events = unifiedCalendarService.getEventsByCalendar(orgcode, calid);
+            Calendar002 matchedEvent = null;
+            for (Calendar002 e : events) {
+                if (e.getTitle() != null && e.getTitle().equals(title) && e.getStartTime() != null) {
+                     String eStartTime = e.getStartTime().toString();
+                     if (eStartTime.startsWith(startTimePrefix) || startTimePrefix.startsWith(eStartTime)) {
+                          matchedEvent = e;
+                          break;
+                     }
+                }
+            }
+            
+            if (matchedEvent != null) {
+                unifiedCalendarService.updateAttendeeResponseStatus(orgcode, calid, matchedEvent.getEventid(), emailHeader, status);
+                return new ResponseEntity<>(HttpStatus.OK);
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Event not found in local calendar");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
 }

@@ -85,6 +85,10 @@ public class Event {
     public String getGraphEventId() { return graphEventId; }
     public void setGraphEventId(String graphEventId) { this.graphEventId = graphEventId; }
 
+    private String status;
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
     private Integer calid;
 
     private Integer orgcode;

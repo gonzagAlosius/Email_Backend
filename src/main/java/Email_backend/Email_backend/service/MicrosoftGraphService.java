@@ -260,6 +260,12 @@ public class MicrosoftGraphService {
             HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
             JsonNode root = objectMapper.readTree(response.getBody());
+            if (root.has("onlineMeeting")) {
+                JsonNode onlineMeeting = root.get("onlineMeeting");
+                if (onlineMeeting.has("joinUrl")) {
+                    req.setMeeturl(onlineMeeting.get("joinUrl").asText());
+                }
+            }
             if (root.has("id")) {
                 return root.get("id").asText();
             }
@@ -302,6 +308,35 @@ public class MicrosoftGraphService {
             restTemplate.exchange(url, HttpMethod.DELETE, entity, String.class);
         } catch (Exception e) {
             System.err.println("Error deleting Microsoft Graph event: " + e.getMessage());
+        }
+    }
+
+    public void updateRsvpStatus(String accessToken, String graphEventId, String status) {
+        if (accessToken == null || accessToken.isEmpty() || graphEventId == null || graphEventId.isEmpty()) return;
+        
+        String action = "tentativelyAccept";
+        if ("ACCEPTED".equalsIgnoreCase(status)) {
+            action = "accept";
+        } else if ("DECLINED".equalsIgnoreCase(status)) {
+            action = "decline";
+        }
+
+        String url = "https://graph.microsoft.com/v1.0/me/events/" + graphEventId + "/" + action;
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        headers.set("Content-Type", "application/json");
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("sendResponse", true);
+
+        try {
+            String jsonBody = objectMapper.writeValueAsString(body);
+            HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
+            restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+        } catch (Exception e) {
+            System.err.println("Error updating RSVP status on Microsoft Graph: " + e.getMessage());
+            throw new RuntimeException("Error updating RSVP status on Microsoft Graph", e);
         }
     }
 }

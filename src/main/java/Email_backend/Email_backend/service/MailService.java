@@ -80,7 +80,7 @@ public class MailService {
         String actualFromEmail = fromEmail;
         String actualPassword = password;
 
-        if (actualPassword == null) {
+        if (actualPassword == null || MailConfigDetector.isOAuthToken(actualPassword)) {
             // Fallback to default sender if password is not available
             actualFromEmail = defaultSender;
             Optional<UserEmailConfig> userConfigOpt = userEmailConfigRepository.findByEmailAddress(actualFromEmail);

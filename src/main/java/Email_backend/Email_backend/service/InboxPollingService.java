@@ -2,6 +2,7 @@ package Email_backend.Email_backend.service;
 
 import Email_backend.Email_backend.model.UserEmailConfig;
 import Email_backend.Email_backend.repository.UserEmailConfigRepository;
+import Email_backend.Email_backend.dto.EventRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,8 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.Scanner;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 /**
  * InboxPollingService
@@ -43,6 +46,9 @@ public class InboxPollingService {
 
     @Autowired
     private UnifiedCalendarService unifiedCalendarService;
+
+    @Autowired
+    private BluehostCalendarService bluehostCalendarService;
 
     @Scheduled(fixedDelay = 60000, initialDelay = 30000)
     public void pollAllUsersForNewEmails() {
@@ -166,6 +172,19 @@ public class InboxPollingService {
                     }
 
                     oneSignalService.sendPushToExternalId(email, title, body, sender);
+                }
+
+                // Process new messages for incoming METHOD:REQUEST calendar invitations
+                for (int i = lastKnown + 1; i <= currentCount; i++) {
+                    try {
+                        Message msg = inbox.getMessage(i);
+                        String domain = email.contains("@") ? email.substring(email.indexOf("@") + 1).toLowerCase().trim() : "";
+                        if (!MailConfigDetector.isMicrosoftDomain(domain) && !MailConfigDetector.isGoogleDomain(domain)) {
+                            processMessageForCalendarRequest(msg, email, resolvedPassword);
+                        }
+                    } catch (Exception ex) {
+                        System.err.println("[InboxPoller] Error processing message " + i + " for calendar request parsing: " + ex.getMessage());
+                    }
                 }
 
                 user.setLastKnownInboxCount(currentCount);
@@ -299,6 +318,109 @@ public class InboxPollingService {
         } else {
             logDebug("UID did not match event-orgcode-calid-eventid@ pattern.");
             logDebug("Raw Unfolded ICS:\n" + unfoldedIcs);
+        }
+    }
+
+    private void processMessageForCalendarRequest(Message msg, String email, String password) {
+        try {
+            if (msg.isMimeType("multipart/*")) {
+                Multipart mp = (Multipart) msg.getContent();
+                for (int i = 0; i < mp.getCount(); i++) {
+                    BodyPart part = mp.getBodyPart(i);
+                    if (part.isMimeType("text/calendar") || (part.getFileName() != null && part.getFileName().toLowerCase().endsWith(".ics"))) {
+                        InputStream is = part.getInputStream();
+                        Scanner s = new Scanner(is).useDelimiter("\\A");
+                        String icsContent = s.hasNext() ? s.next() : "";
+                        is.close();
+                        if (!icsContent.isEmpty()) {
+                            parseAndCreateEventRequest(icsContent, email, password);
+                        }
+                    }
+                }
+            } else if (msg.isMimeType("text/calendar") || (msg.getFileName() != null && msg.getFileName().toLowerCase().endsWith(".ics"))) {
+                InputStream is = msg.getInputStream();
+                Scanner s = new Scanner(is).useDelimiter("\\A");
+                String icsContent = s.hasNext() ? s.next() : "";
+                is.close();
+                if (!icsContent.isEmpty()) {
+                    parseAndCreateEventRequest(icsContent, email, password);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[InboxPoller] Failed to process calendar request: " + e.getMessage());
+        }
+    }
+
+    private void parseAndCreateEventRequest(String icsContent, String email, String password) {
+        String unfoldedIcs = icsContent.replaceAll("(\\r?\\n)[ \\t]", "");
+        if (!unfoldedIcs.toUpperCase().contains("METHOD:REQUEST")) {
+            return;
+        }
+        
+        EventRequest req = new EventRequest();
+        
+        Matcher sumMatcher = Pattern.compile("SUMMARY:(.*?)[\\r\\n]", Pattern.CASE_INSENSITIVE).matcher(unfoldedIcs);
+        if (sumMatcher.find()) req.setTitle(sumMatcher.group(1).trim());
+        
+        Matcher descMatcher = Pattern.compile("DESCRIPTION:(.*?)[\\r\\n]", Pattern.CASE_INSENSITIVE).matcher(unfoldedIcs);
+        if (descMatcher.find()) req.setDescription(descMatcher.group(1).trim().replace("\\n", "\n"));
+        
+        Matcher locMatcher = Pattern.compile("LOCATION:(.*?)[\\r\\n]", Pattern.CASE_INSENSITIVE).matcher(unfoldedIcs);
+        if (locMatcher.find()) req.setLocation(locMatcher.group(1).trim().replace("\\,", ","));
+        
+        DateTimeFormatter f = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'");
+        Matcher startMatcher = Pattern.compile("DTSTART(?:[^:]*):(\\d{8}T\\d{6}Z?)", Pattern.CASE_INSENSITIVE).matcher(unfoldedIcs);
+        if (startMatcher.find()) {
+            String startStr = startMatcher.group(1);
+            if (!startStr.endsWith("Z")) startStr += "Z";
+            try {
+                req.setStartTime(LocalDateTime.parse(startStr, f));
+            } catch (Exception ignored) {}
+        }
+        
+        Matcher endMatcher = Pattern.compile("DTEND(?:[^:]*):(\\d{8}T\\d{6}Z?)", Pattern.CASE_INSENSITIVE).matcher(unfoldedIcs);
+        if (endMatcher.find()) {
+            String endStr = endMatcher.group(1);
+            if (!endStr.endsWith("Z")) endStr += "Z";
+            try {
+                req.setEndTime(LocalDateTime.parse(endStr, f));
+            } catch (Exception ignored) {}
+        }
+        
+        req.setAllDay(false);
+        if (req.getTitle() != null && req.getStartTime() != null) {
+            // 1. Insert into local Calendar002
+            try {
+                Email_backend.Email_backend.model.Calendar002 cal2 = new Email_backend.Email_backend.model.Calendar002();
+                cal2.setTitle(req.getTitle());
+                cal2.setDescription(req.getDescription());
+                cal2.setLocation(req.getLocation());
+                cal2.setStartTime(req.getStartTime());
+                cal2.setEndTime(req.getEndTime());
+                cal2.setIsAllDay(0);
+                
+                List<Email_backend.Email_backend.model.Calendar001> userCals = unifiedCalendarService.getCalendarsForUser(email);
+                if (userCals != null && !userCals.isEmpty()) {
+                    cal2.setOrgcode(userCals.get(0).getOrgcode());
+                    cal2.setCalid(userCals.get(0).getCalid());
+                } else {
+                    cal2.setOrgcode(1);
+                }
+                
+                cal2.setStatus("PENDING_INVITATION");
+
+                UnifiedCalendarService.EventCreationRequest uReq = new UnifiedCalendarService.EventCreationRequest();
+                uReq.setEvent(cal2);
+                uReq.setAttendees(new java.util.ArrayList<>());
+                
+                unifiedCalendarService.createEvent(email, uReq);
+                System.out.println("[InboxPoller] Created new event from invitation for " + email + " in local calendar");
+            } catch (Exception e) {
+                System.err.println("[InboxPoller] Error saving to local calendar: " + e.getMessage());
+            }
+
+            // 2. Insert into Roundcube (Bluehost)
+            bluehostCalendarService.createCalendarEvent(email, password, req, null);
         }
     }
 }

@@ -181,4 +181,37 @@ public class EventController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error fetching graph event: " + e.getMessage());
         }
     }
+
+    @PutMapping("/graph/{graphEventId}/rsvp")
+    public ResponseEntity<?> updateGraphRsvp(
+            @PathVariable String graphEventId,
+            @RequestBody java.util.Map<String, String> body,
+            @RequestHeader(value = "X-Email", required = false) String email,
+            @RequestHeader(value = "X-Password", required = false) String password) {
+        
+        if (email == null || email.trim().isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Email header is missing");
+        }
+
+        String actualPassword = password;
+        if (email != null && !email.trim().isEmpty() && (actualPassword == null || actualPassword.trim().isEmpty())) {
+            Optional<UserEmailConfig> configOpt = userEmailConfigRepository.findByEmailAddress(email);
+            if (configOpt.isPresent()) {
+                actualPassword = encryptionService.decrypt(configOpt.get().getEncryptedPassword());
+            }
+        }
+
+        String status = body.get("status");
+        if (status == null || status.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Status is missing in request body");
+        }
+
+        try {
+            service.updateExternalRsvp(graphEventId, email, actualPassword, status);
+            return ResponseEntity.ok("RSVP updated on external calendar successfully");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to update RSVP on external calendar: " + e.getMessage());
+        }
+    }
 }

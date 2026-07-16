@@ -7,6 +7,8 @@ public class EmailRequest {
     private String cc;
     private String subject;
     private String content;
+    private String inReplyTo;
+    private String references;
     private List<AttachmentRequest> attachments;
     private Long draftUid;
 
@@ -26,6 +28,12 @@ public class EmailRequest {
     
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
+
+    public String getInReplyTo() { return inReplyTo; }
+    public void setInReplyTo(String inReplyTo) { this.inReplyTo = inReplyTo; }
+
+    public String getReferences() { return references; }
+    public void setReferences(String references) { this.references = references; }
 
     public List<AttachmentRequest> getAttachments() { return attachments; }
     public void setAttachments(List<AttachmentRequest> attachments) { this.attachments = attachments; }
