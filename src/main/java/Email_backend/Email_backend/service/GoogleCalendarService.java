@@ -211,6 +211,16 @@ public class GoogleCalendarService {
         }
         if (!attendees.isEmpty()) {
             body.put("attendees", attendees);
+            
+            // Generate a meet link for meetings
+            Map<String, Object> conferenceData = new HashMap<>();
+            Map<String, Object> createRequest = new HashMap<>();
+            createRequest.put("requestId", java.util.UUID.randomUUID().toString());
+            Map<String, String> conferenceSolutionKey = new HashMap<>();
+            conferenceSolutionKey.put("type", "hangoutsMeet");
+            createRequest.put("conferenceSolutionKey", conferenceSolutionKey);
+            conferenceData.put("createRequest", createRequest);
+            body.put("conferenceData", conferenceData);
         }
         return body;
     }
@@ -219,7 +229,7 @@ public class GoogleCalendarService {
         String accessToken = getAccessToken(token);
         if (accessToken == null) return null;
         
-        String url = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
+        String url = "https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all&conferenceDataVersion=1";
         Map<String, Object> body = buildGoogleEventBody(req);
 
         HttpHeaders headers = new HttpHeaders();
@@ -231,6 +241,11 @@ public class GoogleCalendarService {
             HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
             JsonNode root = objectMapper.readTree(response.getBody());
+            
+            if (root.has("hangoutLink")) {
+                req.setMeeturl(root.get("hangoutLink").asText());
+            }
+
             if (root.has("id")) {
                 return root.get("id").asText();
             }
@@ -244,7 +259,7 @@ public class GoogleCalendarService {
         String accessToken = getAccessToken(token);
         if (accessToken == null || eventId == null || eventId.isEmpty()) return;
         
-        String url = "https://www.googleapis.com/calendar/v3/calendars/primary/events/" + eventId;
+        String url = "https://www.googleapis.com/calendar/v3/calendars/primary/events/" + eventId + "?sendUpdates=all&conferenceDataVersion=1";
         Map<String, Object> body = buildGoogleEventBody(req);
 
         HttpHeaders headers = new HttpHeaders();
@@ -264,7 +279,7 @@ public class GoogleCalendarService {
         String accessToken = getAccessToken(token);
         if (accessToken == null || eventId == null || eventId.isEmpty()) return;
         
-        String url = "https://www.googleapis.com/calendar/v3/calendars/primary/events/" + eventId;
+        String url = "https://www.googleapis.com/calendar/v3/calendars/primary/events/" + eventId + "?sendUpdates=all";
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + accessToken);
 
@@ -273,6 +288,50 @@ public class GoogleCalendarService {
             restTemplate.exchange(url, HttpMethod.DELETE, entity, String.class);
         } catch (Exception e) {
             System.err.println("Error deleting Google Calendar event: " + e.getMessage());
+        }
+    }
+
+    public void updateRsvpStatus(String token, String eventId, String currentUserEmail, String status) {
+        String accessToken = getAccessToken(token);
+        if (accessToken == null || eventId == null || eventId.isEmpty() || currentUserEmail == null) return;
+
+        Map<String, Object> event = fetchCalendarEventById(token, eventId);
+        if (event == null) return;
+
+        String googleStatus = "tentative";
+        if ("ACCEPTED".equalsIgnoreCase(status)) {
+            googleStatus = "accepted";
+        } else if ("DECLINED".equalsIgnoreCase(status)) {
+            googleStatus = "declined";
+        }
+
+        boolean updated = false;
+        if (event.containsKey("attendees")) {
+            List<Map<String, Object>> attendees = (List<Map<String, Object>>) event.get("attendees");
+            for (Map<String, Object> attendee : attendees) {
+                String email = (String) attendee.get("email");
+                if (currentUserEmail.equalsIgnoreCase(email)) {
+                    attendee.put("responseStatus", googleStatus);
+                    updated = true;
+                    break;
+                }
+            }
+        }
+
+        if (updated) {
+            String url = "https://www.googleapis.com/calendar/v3/calendars/primary/events/" + eventId;
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + accessToken);
+            headers.set("Content-Type", "application/json");
+
+            try {
+                String jsonBody = objectMapper.writeValueAsString(event);
+                HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
+                restTemplate.exchange(url, HttpMethod.PUT, entity, String.class);
+            } catch (Exception e) {
+                System.err.println("Error updating RSVP status on Google Calendar: " + e.getMessage());
+                throw new RuntimeException("Error updating RSVP status on Google Calendar", e);
+            }
         }
     }
 }

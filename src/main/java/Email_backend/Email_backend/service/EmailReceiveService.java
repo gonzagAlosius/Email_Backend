@@ -136,6 +136,14 @@ public class EmailReceiveService {
                 }
             }
 
+            if (msg instanceof javax.mail.internet.MimeMessage) {
+                try {
+                    dto.setMessageId(((javax.mail.internet.MimeMessage) msg).getMessageID());
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+
             dto.setSubject(msg.getSubject() != null ? msg.getSubject() : "(No Subject)");
             dto.setDate(msg.getSentDate() != null ? msg.getSentDate().toString() : "");
 
@@ -228,6 +236,15 @@ public class EmailReceiveService {
                             "WARNING: Cannot set SEEN flag because folder " + folderName + " is in READ_ONLY mode");
                 }
                 dto.setUid(uid);
+                
+                if (msg instanceof javax.mail.internet.MimeMessage) {
+                    try {
+                        dto.setMessageId(((javax.mail.internet.MimeMessage) msg).getMessageID());
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
                 Address[] froms = msg.getFrom();
                 if (froms != null && froms.length > 0) {
                     String fromAuth = froms[0].toString();

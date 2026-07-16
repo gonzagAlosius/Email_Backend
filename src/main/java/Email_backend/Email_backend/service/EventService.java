@@ -254,6 +254,7 @@ public class EventService {
                     e.setCalid(c2.getCalid());
                     e.setOrgcode(c2.getOrgcode());
                     e.setMeeturl(c2.getMeeturl());
+                    e.setStatus(c2.getStatus());
                     allEvents.add(e);
                 }
             }
@@ -333,5 +334,22 @@ public class EventService {
             }
         }
         return null;
+    }
+
+    public void updateExternalRsvp(String graphEventId, String email, String password, String status) {
+        if (email == null || email.isEmpty() || password == null || password.isEmpty() || graphEventId == null) {
+            return;
+        }
+        String domain = email.contains("@") ? email.substring(email.indexOf("@") + 1) : "";
+        if (MailConfigDetector.isMicrosoftDomain(domain)) {
+            String graphToken = MailConfigDetector.resolveGraphPassword(email, password);
+            if (graphToken != null && MailConfigDetector.isOAuthToken(graphToken)) {
+                microsoftGraphService.updateRsvpStatus(graphToken, graphEventId, status);
+            }
+        } else if (MailConfigDetector.isGoogleDomain(domain)) {
+            if (password != null && MailConfigDetector.isOAuthToken(password)) {
+                googleCalendarService.updateRsvpStatus(password, graphEventId, email, status);
+            }
+        }
     }
 }

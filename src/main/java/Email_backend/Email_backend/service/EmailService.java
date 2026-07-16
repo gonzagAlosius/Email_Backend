@@ -84,7 +84,14 @@ public class EmailService {
             }
 
             helper.setSubject(emailRequest.getSubject());
-            helper.setText(emailRequest.getContent());
+            helper.setText(emailRequest.getContent(), true); // true = HTML
+
+            if (emailRequest.getInReplyTo() != null && !emailRequest.getInReplyTo().isEmpty()) {
+                message.setHeader("In-Reply-To", emailRequest.getInReplyTo());
+            }
+            if (emailRequest.getReferences() != null && !emailRequest.getReferences().isEmpty()) {
+                message.setHeader("References", emailRequest.getReferences());
+            }
 
             if (emailRequest.getAttachments() != null) {
                 for (EmailRequest.AttachmentRequest att : emailRequest.getAttachments()) {
@@ -211,6 +218,14 @@ public class EmailService {
         }
         message.setSubject(emailRequest.getSubject() != null ? emailRequest.getSubject() : "");
         message.setContent(emailRequest.getContent() != null ? emailRequest.getContent() : "", "text/html; charset=utf-8");
+        
+        if (emailRequest.getInReplyTo() != null && !emailRequest.getInReplyTo().isEmpty()) {
+            message.setHeader("In-Reply-To", emailRequest.getInReplyTo());
+        }
+        if (emailRequest.getReferences() != null && !emailRequest.getReferences().isEmpty()) {
+            message.setHeader("References", emailRequest.getReferences());
+        }
+        
         message.setFlag(javax.mail.Flags.Flag.DRAFT, true);
         message.saveChanges();
 

@@ -67,14 +67,18 @@ public class UnifiedCalendarService {
 
     public List<Calendar001> getCalendarsForUser(String email) {
         if (email == null || email.trim().isEmpty()) {
-            return calendar001Repository.findAll();
+            return new java.util.ArrayList<>();
         }
         Optional<UserEmailConfig> configOpt = userEmailConfigRepository.findByEmailAddress(email);
         if (configOpt.isPresent()) {
-            Integer orgcode = configOpt.get().getOrgcode().intValue();
-            return calendar001Repository.findByOrgcode(orgcode);
+            String userIdStr = configOpt.get().getUserId().toString();
+            List<Calendar001> cals = calendar001Repository.findByUserId(userIdStr);
+            if (cals != null && !cals.isEmpty()) {
+                return cals;
+            }
         }
-        return calendar001Repository.findAll();
+        List<Calendar001> emailCals = calendar001Repository.findByUserId(email);
+        return emailCals != null ? emailCals : new java.util.ArrayList<>();
     }
 
     public Optional<Calendar001> getCalendarById(Integer id) {
