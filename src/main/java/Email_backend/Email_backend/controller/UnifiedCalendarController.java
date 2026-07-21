@@ -2,6 +2,7 @@ package Email_backend.Email_backend.controller;
 
 import Email_backend.Email_backend.model.Calendar001;
 import Email_backend.Email_backend.model.Calendar002;
+import Email_backend.Email_backend.model.Calendar003;
 import Email_backend.Email_backend.service.UnifiedCalendarService;
 import Email_backend.Email_backend.service.UnifiedCalendarService.EventCreationRequest;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +10,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
@@ -154,6 +157,33 @@ public class UnifiedCalendarController {
         }
     }
 
+    private LocalDateTime parseLocalDateTime(String dateStr) {
+        if (dateStr == null || dateStr.trim().isEmpty()) return null;
+        try {
+            String cleaned = dateStr.trim();
+            if (cleaned.contains("+")) {
+                cleaned = cleaned.substring(0, cleaned.indexOf("+"));
+            }
+            if (cleaned.endsWith("Z")) {
+                cleaned = cleaned.substring(0, cleaned.length() - 1);
+            }
+            if (cleaned.contains("T")) {
+                int dotIdx = cleaned.indexOf(".");
+                if (dotIdx != -1) {
+                    cleaned = cleaned.substring(0, dotIdx);
+                }
+                return LocalDateTime.parse(cleaned, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            } else if (cleaned.contains(" ")) {
+                int dotIdx = cleaned.indexOf(".");
+                if (dotIdx != -1) {
+                    cleaned = cleaned.substring(0, dotIdx);
+                }
+                return LocalDateTime.parse(cleaned.replace(" ", "T"), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
     @PutMapping("/api/calendar-events/rsvp-from-email")
     public ResponseEntity<?> updateRsvpFromEmail(
             @RequestBody java.util.Map<String, String> payload,
@@ -170,34 +200,96 @@ public class UnifiedCalendarController {
                  return ResponseEntity.badRequest().body("Missing required fields");
             }
             
-            String startTimePrefix = startTimeStr;
-            if (startTimePrefix.length() > 16) {
-                startTimePrefix = startTimePrefix.substring(0, 16);
+            List<Calendar001> cals = unifiedCalendarService.getCalendarsForUser(emailHeader);
+            if (cals.isEmpty()) {
+                Calendar001 defaultCal = new Calendar001();
+                defaultCal.setCalname("My Calendar");
+                defaultCal.setUserid(emailHeader);
+                defaultCal.setCuser(emailHeader);
+                Calendar001 createdCal = unifiedCalendarService.createCalendar(defaultCal);
+                cals = java.util.Collections.singletonList(createdCal);
             }
             
-            List<Calendar001> cals = unifiedCalendarService.getCalendarsForUser(emailHeader);
-            if (cals.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No calendar found");
+            String normTitle = title.trim().toLowerCase();
+            LocalDateTime targetStart = parseLocalDateTime(startTimeStr);
             
-            Integer orgcode = cals.get(0).getOrgcode();
-            Integer calid = cals.get(0).getCalid();
-            
-            List<Calendar002> events = unifiedCalendarService.getEventsByCalendar(orgcode, calid);
             Calendar002 matchedEvent = null;
-            for (Calendar002 e : events) {
-                if (e.getTitle() != null && e.getTitle().equals(title) && e.getStartTime() != null) {
-                     String eStartTime = e.getStartTime().toString();
-                     if (eStartTime.startsWith(startTimePrefix) || startTimePrefix.startsWith(eStartTime)) {
-                          matchedEvent = e;
-                          break;
-                     }
+            Integer matchedOrgcode = null;
+            Integer matchedCalid = null;
+            
+            for (Calendar001 cal : cals) {
+                List<Calendar002> events = unifiedCalendarService.getEventsByCalendar(cal.getOrgcode(), cal.getCalid());
+                for (Calendar002 e : events) {
+                    if (e.getTitle() == null) continue;
+                    String eTitle = e.getTitle().trim().toLowerCase();
+                    boolean titleMatches = eTitle.equals(normTitle) || eTitle.contains(normTitle) || normTitle.contains(eTitle);
+                    
+                    if (titleMatches) {
+                        if (targetStart != null && e.getStartTime() != null) {
+                            if (targetStart.toLocalDate().equals(e.getStartTime().toLocalDate())) {
+                                long minutesDiff = Math.abs(java.time.Duration.between(targetStart, e.getStartTime()).toMinutes());
+                                if (minutesDiff <= 60) {
+                                    matchedEvent = e;
+                                    matchedOrgcode = cal.getOrgcode();
+                                    matchedCalid = cal.getCalid();
+                                    break;
+                                }
+                            }
+                        } else {
+                            if (eTitle.equals(normTitle)) {
+                                matchedEvent = e;
+                                matchedOrgcode = cal.getOrgcode();
+                                matchedCalid = cal.getCalid();
+                                break;
+                            }
+                        }
+                    }
                 }
+                if (matchedEvent != null) break;
             }
             
             if (matchedEvent != null) {
-                unifiedCalendarService.updateAttendeeResponseStatus(orgcode, calid, matchedEvent.getEventid(), emailHeader, status);
+                unifiedCalendarService.updateAttendeeResponseStatus(matchedOrgcode, matchedCalid, matchedEvent.getEventid(), emailHeader, status);
+                matchedEvent.setStatus(status);
+                unifiedCalendarService.updateEvent(matchedCalid, matchedOrgcode, matchedEvent.getEventid(), matchedEvent);
                 return new ResponseEntity<>(HttpStatus.OK);
             } else {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Event not found in local calendar");
+                // Auto-create event in local calendar so RSVP succeeds and adds the event to user's calendar!
+                Calendar001 primaryCal = cals.get(0);
+                Calendar002 newEvent = new Calendar002();
+                newEvent.setOrgcode(primaryCal.getOrgcode());
+                newEvent.setCalid(primaryCal.getCalid());
+                newEvent.setTitle(title);
+                newEvent.setStatus(status);
+                newEvent.setLocation(payload.getOrDefault("location", ""));
+                newEvent.setMeeturl(payload.getOrDefault("meeturl", ""));
+                newEvent.setDescription(payload.getOrDefault("description", ""));
+                
+                LocalDateTime start = targetStart != null ? targetStart : LocalDateTime.now();
+                String endTimeStr = payload.get("endTime");
+                LocalDateTime end = parseLocalDateTime(endTimeStr);
+                if (end == null) {
+                    end = start.plusHours(1);
+                }
+                
+                newEvent.setStartTime(start);
+                newEvent.setEndTime(end);
+                newEvent.setIsAllDay(0);
+                newEvent.setCreatedAt(LocalDateTime.now());
+                
+                EventCreationRequest req = new EventCreationRequest();
+                req.setEvent(newEvent);
+                
+                Calendar003 selfAttendee = new Calendar003();
+                selfAttendee.setEmail(emailHeader);
+                selfAttendee.setResponseStatus(status);
+                selfAttendee.setRestimestamp(LocalDateTime.now());
+                selfAttendee.setIsOptional(false);
+                
+                req.setAttendees(java.util.Collections.singletonList(selfAttendee));
+                
+                unifiedCalendarService.createEvent(emailHeader, req);
+                return new ResponseEntity<>(HttpStatus.OK);
             }
         } catch (Exception e) {
             e.printStackTrace();

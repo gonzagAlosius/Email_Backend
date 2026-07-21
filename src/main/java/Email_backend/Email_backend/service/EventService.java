@@ -64,7 +64,7 @@ public class EventService {
                 Integer orgcode = req.getOrgcode();
                 
                 if (calid == null || orgcode == null) {
-                    java.util.List<Email_backend.Email_backend.model.Calendar001> userCalendars = unifiedCalendarService.getCalendarsByUserId(email);
+                    java.util.List<Email_backend.Email_backend.model.Calendar001> userCalendars = unifiedCalendarService.getCalendarsForUser(email);
                     if (userCalendars != null && !userCalendars.isEmpty()) {
                         calid = userCalendars.get(0).getCalid();
                         orgcode = userCalendars.get(0).getOrgcode();
@@ -236,9 +236,21 @@ public class EventService {
     // GET ALL EVENTS
     public List<Event> getAllEvents(String email, String password, Integer calid, Integer orgcode) {
         List<Event> allEvents = new ArrayList<>();
-        
-        if (calid != null && orgcode != null) {
-            List<Email_backend.Email_backend.model.Calendar002> cal2Events = unifiedCalendarService.getEventsByCalendar(orgcode, calid);
+        Map<String, Event> graphIdToLocalEvent = new java.util.HashMap<>();
+
+        Integer queryCalid = calid;
+        Integer queryOrgcode = orgcode;
+
+        if ((queryCalid == null || queryOrgcode == null) && email != null && !email.isEmpty()) {
+            java.util.List<Email_backend.Email_backend.model.Calendar001> userCalendars = unifiedCalendarService.getCalendarsForUser(email);
+            if (userCalendars != null && !userCalendars.isEmpty()) {
+                queryCalid = userCalendars.get(0).getCalid();
+                queryOrgcode = userCalendars.get(0).getOrgcode();
+            }
+        }
+
+        if (queryCalid != null && queryOrgcode != null) {
+            List<Email_backend.Email_backend.model.Calendar002> cal2Events = unifiedCalendarService.getEventsByCalendar(queryOrgcode, queryCalid);
             if (cal2Events != null) {
                 for (Email_backend.Email_backend.model.Calendar002 c2 : cal2Events) {
                     Event e = new Event();
@@ -258,10 +270,11 @@ public class EventService {
                     allEvents.add(e);
                 }
             }
-            return allEvents;
         }
 
-        Map<String, Event> graphIdToLocalEvent = new java.util.HashMap<>();
+        if (calid != null && orgcode != null) {
+            return allEvents;
+        }
         
         // 1. We no longer fetch local events from repo
         // allEvents from email_dev.events are ignored.
