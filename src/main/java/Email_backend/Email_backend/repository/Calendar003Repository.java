@@ -19,7 +19,7 @@ public class Calendar003Repository {
         if (attendees == null || attendees.isEmpty()) {
             return;
         }
-        String sql = "INSERT INTO calender_dev.calendar003 (orgcode, calid, event_id, email, display_name, response_status, restimestamp, is_optional) " +
+        String sql = "INSERT INTO calendar003 (orgcode, calid, event_id, email, display_name, response_status, restimestamp, is_optional) " +
                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
                      
         jdbcTemplate.batchUpdate(sql, attendees, attendees.size(), (PreparedStatement ps, Calendar003 attendee) -> {
@@ -35,18 +35,18 @@ public class Calendar003Repository {
     }
 
     public void updateResponseStatus(Integer orgcode, Integer calid, Integer eventId, String email, String responseStatus) {
-        String sql = "UPDATE calender_dev.calendar003 SET response_status = ?, restimestamp = NOW() " +
+        String sql = "UPDATE calendar003 SET response_status = ?, restimestamp = NOW() " +
                      "WHERE orgcode = ? AND calid = ? AND event_id = ? AND email = ?";
         int updated = jdbcTemplate.update(sql, responseStatus, orgcode, calid, eventId, email);
         if (updated == 0) {
-            String insertSql = "INSERT INTO calender_dev.calendar003 (orgcode, calid, event_id, email, response_status, restimestamp, is_optional) " +
+            String insertSql = "INSERT INTO calendar003 (orgcode, calid, event_id, email, response_status, restimestamp, is_optional) " +
                                "VALUES (?, ?, ?, ?, ?, NOW(), false)";
             jdbcTemplate.update(insertSql, orgcode, calid, eventId, email, responseStatus);
         }
     }
 
     public void deleteByEventId(Integer orgcode, Integer calid, Integer eventId) {
-        String sql = "DELETE FROM calender_dev.calendar003 WHERE orgcode = ? AND calid = ? AND event_id = ?";
+        String sql = "DELETE FROM calendar003 WHERE orgcode = ? AND calid = ? AND event_id = ?";
         jdbcTemplate.update(sql, orgcode, calid, eventId);
     }
 }

@@ -57,7 +57,7 @@ public class EventService {
 
         String ics = null;
 
-        // 1b. Save in calender_dev.calendar002 and 003
+        // 1b. Save in calendar002 and calendar003
         if (email != null && !email.isEmpty()) {
             try {
                 Integer calid = req.getCalid();
@@ -236,6 +236,7 @@ public class EventService {
     // GET ALL EVENTS
     public List<Event> getAllEvents(String email, String password, Integer calid, Integer orgcode) {
         List<Event> allEvents = new ArrayList<>();
+        List<Event> localEvents = new ArrayList<>();
         Map<String, Event> graphIdToLocalEvent = new java.util.HashMap<>();
 
         Integer queryCalid = calid;
@@ -268,6 +269,7 @@ public class EventService {
                     e.setMeeturl(c2.getMeeturl());
                     e.setStatus(c2.getStatus());
                     allEvents.add(e);
+                    localEvents.add(e);
                 }
             }
         }
@@ -275,9 +277,6 @@ public class EventService {
         if (calid != null && orgcode != null) {
             return allEvents;
         }
-        
-        // 1. We no longer fetch local events from repo
-        // allEvents from email_dev.events are ignored.
         
         // 2. Fetch MS Graph events if valid credentials
         if (email != null && password != null) {
@@ -292,7 +291,10 @@ public class EventService {
                     System.out.println("[DEBUG] Fetched " + graphEvents.size() + " events from MS Graph.");
                     for (Event ge : graphEvents) {
                         if (ge.getGraphEventId() != null && graphIdToLocalEvent.containsKey(ge.getGraphEventId())) {
-                            // Deduplicate: Event already exists locally, we keep the local one which has the DB ID.
+                            continue;
+                        }
+                        if (isDuplicateAndMerge(ge, localEvents)) {
+                            System.out.println("[DEBUG] Skipping duplicate MS Graph event: " + ge.getTitle());
                             continue;
                         }
                         allEvents.add(ge);
@@ -309,6 +311,10 @@ public class EventService {
                         if (ge.getGraphEventId() != null && graphIdToLocalEvent.containsKey(ge.getGraphEventId())) {
                             continue;
                         }
+                        if (isDuplicateAndMerge(ge, localEvents)) {
+                            System.out.println("[DEBUG] Skipping duplicate Google event: " + ge.getTitle());
+                            continue;
+                        }
                         allEvents.add(ge);
                     }
                 } else {
@@ -322,6 +328,10 @@ public class EventService {
                     if (ge.getGraphEventId() != null && graphIdToLocalEvent.containsKey(ge.getGraphEventId())) {
                         continue;
                     }
+                    if (isDuplicateAndMerge(ge, localEvents)) {
+                        System.out.println("[DEBUG] Skipping duplicate Bluehost event: " + ge.getTitle());
+                        continue;
+                    }
                     allEvents.add(ge);
                 }
             }
@@ -330,6 +340,33 @@ public class EventService {
         }
         
         return allEvents;
+    }
+
+    private boolean isDuplicateAndMerge(Event externalEvent, List<Event> localEvents) {
+        if (externalEvent == null || localEvents == null || localEvents.isEmpty()) {
+            return false;
+        }
+        String extTitle = externalEvent.getTitle() != null ? externalEvent.getTitle().trim().toLowerCase() : "";
+        for (Event local : localEvents) {
+            String localTitle = local.getTitle() != null ? local.getTitle().trim().toLowerCase() : "";
+            if (extTitle.equals(localTitle)) {
+                if (externalEvent.getStartTime() != null && local.getStartTime() != null) {
+                    long diffMinutes = Math.abs(java.time.Duration.between(externalEvent.getStartTime(), local.getStartTime()).toMinutes());
+                    if (diffMinutes <= 2) {
+                        if (local.getGraphEventId() == null && externalEvent.getGraphEventId() != null) {
+                            local.setGraphEventId(externalEvent.getGraphEventId());
+                        }
+                        return true;
+                    }
+                } else if (externalEvent.getStartTime() == null && local.getStartTime() == null) {
+                    if (local.getGraphEventId() == null && externalEvent.getGraphEventId() != null) {
+                        local.setGraphEventId(externalEvent.getGraphEventId());
+                    }
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public Map<String, Object> getGraphEventById(String graphEventId, String email, String password) {

@@ -139,6 +139,22 @@ public class UnifiedCalendarService {
             event.setCreatedAt(LocalDateTime.now());
         }
 
+        // Check for duplicates (same title and start time within 1 minute)
+        List<Calendar002> dup = calendar002Repository.findDuplicate(event.getOrgcode(), event.getCalid(), event.getTitle(), event.getStartTime());
+        if (dup != null && !dup.isEmpty()) {
+            // If duplicate found, attach attendees to the existing event id and return existing
+            Calendar002 existing = dup.get(0);
+            if (attendees != null && !attendees.isEmpty()) {
+                for (Calendar003 attendee : attendees) {
+                    attendee.setOrgcode(existing.getOrgcode());
+                    attendee.setCalid(existing.getCalid());
+                    attendee.setEventId(existing.getEventid());
+                }
+                calendar003Repository.saveAll(attendees);
+            }
+            return existing;
+        }
+
         Calendar002 savedEvent = calendar002Repository.save(event);
 
         if (attendees != null && !attendees.isEmpty()) {
