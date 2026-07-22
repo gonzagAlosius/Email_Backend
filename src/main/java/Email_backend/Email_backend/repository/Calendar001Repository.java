@@ -55,11 +55,11 @@ public class Calendar001Repository {
     public Calendar001 save(Calendar001 calendar) {
         // Since calid is constrained by a unique key (orgcode, calid), 
         // we must generate the next calid per orgcode, not per user.
-        String maxIdSql = "SELECT COALESCE(MAX(calid), 0) + 1 FROM calender_dev.calendar001 WHERE orgcode = ?";
+        String maxIdSql = "SELECT COALESCE(MAX(calid), 0) + 1 FROM calendar001 WHERE orgcode = ?";
         Integer nextCalid = jdbcTemplate.queryForObject(maxIdSql, Integer.class, calendar.getOrgcode());
         calendar.setCalid(nextCalid);
 
-        String sql = "INSERT INTO calender_dev.calendar001 (orgcode, userid, calid, calname, timezone, country, cuser, cdate) " +
+        String sql = "INSERT INTO calendar001 (orgcode, userid, calid, calname, timezone, country, cuser, cdate) " +
                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
                      
         jdbcTemplate.update(connection -> {
@@ -79,28 +79,28 @@ public class Calendar001Repository {
     }
 
     public List<Calendar001> findAll() {
-        String sql = "SELECT * FROM calender_dev.calendar001";
+        String sql = "SELECT * FROM calendar001";
         return jdbcTemplate.query(sql, rowMapper);
     }
 
     public Optional<Calendar001> findById(Integer calid) {
-        String sql = "SELECT * FROM calender_dev.calendar001 WHERE calid = ?";
+        String sql = "SELECT * FROM calendar001 WHERE calid = ?";
         List<Calendar001> results = jdbcTemplate.query(sql, rowMapper, calid);
         return results.stream().findFirst();
     }
 
     public List<Calendar001> findByUserId(String userid) {
-        String sql = "SELECT * FROM calender_dev.calendar001 WHERE userid = ?";
+        String sql = "SELECT * FROM calendar001 WHERE userid = ?";
         return jdbcTemplate.query(sql, rowMapper, userid);
     }
 
     public List<Calendar001> findByOrgcode(Integer orgcode) {
-        String sql = "SELECT * FROM calender_dev.calendar001 WHERE orgcode = ?";
+        String sql = "SELECT * FROM calendar001 WHERE orgcode = ?";
         return jdbcTemplate.query(sql, rowMapper, orgcode);
     }
 
     public int update(Calendar001 calendar) {
-        String sql = "UPDATE calender_dev.calendar001 SET orgcode = ?, userid = ?, calname = ?, timezone = ?, " +
+        String sql = "UPDATE calendar001 SET orgcode = ?, userid = ?, calname = ?, timezone = ?, " +
                      "country = ?, euser = ?, edate = ?, auser = ?, adate = ? WHERE calid = ?";
         return jdbcTemplate.update(sql,
                 calendar.getOrgcode(),
@@ -116,7 +116,7 @@ public class Calendar001Repository {
     }
 
     public int deleteById(Integer calid) {
-        String sql = "DELETE FROM calender_dev.calendar001 WHERE calid = ?";
+        String sql = "DELETE FROM calendar001 WHERE calid = ?";
         return jdbcTemplate.update(sql, calid);
     }
 }

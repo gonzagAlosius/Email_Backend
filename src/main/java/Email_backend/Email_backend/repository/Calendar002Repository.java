@@ -39,11 +39,11 @@ public class Calendar002Repository {
     };
 
     public Calendar002 save(Calendar002 event) {
-        String maxIdSql = "SELECT COALESCE(MAX(eventid), 0) + 1 FROM calender_dev.calendar002 WHERE orgcode = ? AND calid = ?";
+        String maxIdSql = "SELECT COALESCE(MAX(eventid), 0) + 1 FROM calendar002 WHERE orgcode = ? AND calid = ?";
         Integer nextEventId = jdbcTemplate.queryForObject(maxIdSql, Integer.class, event.getOrgcode(), event.getCalid());
         event.setEventid(nextEventId);
 
-        String sql = "INSERT INTO calender_dev.calendar002 (orgcode, calid, eventid, organizer_id, title, description, location, " +
+        String sql = "INSERT INTO calendar002 (orgcode, calid, eventid, organizer_id, title, description, location, " +
                      "start_time, end_time, is_all_day, is_recurring, recurrence_rule, meeturl, enddate, status, created_at) " +
                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
@@ -72,12 +72,22 @@ public class Calendar002Repository {
     }
 
     public List<Calendar002> findByCalid(Integer orgcode, Integer calid) {
-        String sql = "SELECT * FROM calender_dev.calendar002 WHERE orgcode = ? AND calid = ?";
+        String sql = "SELECT * FROM calendar002 WHERE orgcode = ? AND calid = ?";
         return jdbcTemplate.query(sql, rowMapper, orgcode, calid);
     }
 
+    public List<Calendar002> findDuplicate(Integer orgcode, Integer calid, String title, java.time.LocalDateTime startTime) {
+        if (orgcode == null || calid == null || title == null || startTime == null) {
+            return new java.util.ArrayList<>();
+        }
+        String sql = "SELECT * FROM calendar002 WHERE orgcode = ? AND calid = ? AND title = ? AND start_time BETWEEN ? AND ?";
+        java.sql.Timestamp start = java.sql.Timestamp.valueOf(startTime.minusMinutes(1));
+        java.sql.Timestamp end = java.sql.Timestamp.valueOf(startTime.plusMinutes(1));
+        return jdbcTemplate.query(sql, rowMapper, orgcode, calid, title, start, end);
+    }
+
     public void update(Calendar002 event) {
-        String sql = "UPDATE calender_dev.calendar002 SET title = ?, description = ?, location = ?, " +
+        String sql = "UPDATE calendar002 SET title = ?, description = ?, location = ?, " +
                      "start_time = ?, end_time = ?, is_all_day = ?, is_recurring = ?, recurrence_rule = ?, " +
                      "meeturl = ?, enddate = ?, status = ?, updated_at = NOW() " +
                      "WHERE orgcode = ? AND calid = ? AND eventid = ?";
@@ -101,7 +111,7 @@ public class Calendar002Repository {
     }
 
     public void delete(Integer orgcode, Integer calid, Integer eventid) {
-        String sql = "DELETE FROM calender_dev.calendar002 WHERE orgcode = ? AND calid = ? AND eventid = ?";
+        String sql = "DELETE FROM calendar002 WHERE orgcode = ? AND calid = ? AND eventid = ?";
         jdbcTemplate.update(sql, orgcode, calid, eventid);
     }
 }
